@@ -67,7 +67,7 @@ to `$23EA`/`$242A`. Slots at `$24EE` x, `$24F6` y, `$24FE` timer, `$2506` spawn 
 Movement, physics, death and animation are traced in `docs/PHYSICS.md`.
 
 ## Not yet traced
-- Sound (`$F8D9` calls with `$DE` flags) — not ported.
+- Chamber-reveal hum (`$8784`).
 (Ball, bird, timer, title screen and chamber X rules: `docs/PHYSICS.md`. `$F5B3`/`$F5BE`
 are the ball's start x/y.)
 - The emulator shows garbage in the score digits; the HUD path isn't traced yet.

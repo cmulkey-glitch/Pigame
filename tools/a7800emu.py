@@ -78,6 +78,7 @@ class Emu:
         s.frame = 0
         s.dli_lines = set()
         s.pending_wsync = False
+        s.pc_hooks = {}   # address -> fn(), called before the instruction at that address runs
     def line(s): return (s.cyc // CPL) % LINES
     def read_io(s, a):
         if a == 0x28:  # MSTAT
@@ -100,7 +101,10 @@ class Emu:
         """Run one 263-line frame. on_line = (line, fn) calls fn() when that line starts."""
         target = (s.frame+1)*LINES*CPL
         cpu = s.cpu
+        hooks = s.pc_hooks
         while s.cyc < target:
+            if hooks and cpu.pc in hooks:
+                hooks[cpu.pc]()
             before = cpu.processorCycles
             cpu.step()
             s.cyc += cpu.processorCycles - before

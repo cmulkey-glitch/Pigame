@@ -134,10 +134,14 @@ export class Player {
         room.tileAt(this.x + 3, (this.y + 16 - this.vyHi) & 0xFF) !== T_FLOOR) {
       this.y = (this.y & 0xF8) + 7;
       this.air = false;
-      if (this.dead) { this.startSplat(); return true; }
+      this.emit('sound', { name: 'stop' });            // [$C134] every landing silences both channels
+      if (this.dead) {
+        this.startSplat();                              // [$C13D]
+        if (this.vyHi < SAFE_LANDING_HI) this.emit('sound', { name: 'splat' });   // and again via $B812
+        return true;
+      }
       if (this.vyHi < SAFE_LANDING_HI) { this.kill(); return true; }
       this.vyHi = 0;
-      this.emit('sound', { name: 'land' });
       return false;
     }
     this.y = (this.y - this.vyHi) & 0xFF;
@@ -175,7 +179,9 @@ export class Player {
       return t === T_ROPE || t === T_ROPE_TOP;
     };
     if (up) {
-      if (onRope(this.y - 1)) this.y--;
+      if (!onRope(this.y - 1)) return;
+      this.y--;
+      if (this.y & 1) this.emit('sound', { name: 'climbUp', randomPitch: true });     // [$B579]
       return;
     }
     const ny = this.y + 2;
@@ -184,6 +190,8 @@ export class Player {
       this.air = true;
       this.vertical = true;
       this.vyHi = 0xFF;
+    } else if (this.y & 2) {
+      this.emit('sound', { name: 'climbDown', randomPitch: true });                   // [$B5DA]
     }
     this.y = ny;
   }

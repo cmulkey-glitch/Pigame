@@ -39,6 +39,10 @@ KEY_COL, KEY_ROW, KEY_DOOR = 0xF487, 0xF4B3, 0xF4DF                 # door+1 -> 
 DOOR_INIT = 0xF50B      # initial open state per door -> $24C2
 DROP_X_LO, DROP_X_HI, DROP_Y_LO, DROP_Y_HI = 0xF3D3, 0xF3DF, 0xF3EB, 0xF3F7  # index = chamber+1
 DROP_TWEAK = 0xF088     # difficulty 2 nudges this spawn point ($B087)
+# 7800basic sound effects: header (version, priority, frames per step), then
+# (AUDF, AUDC, AUDV) triples ending in 0,0,0. Addresses are the ROM's playsfx calls.
+SOUNDS = {'bump': 0xDDFA, 'pickup': 0xDE09, 'run': 0xDE1B, 'jump': 0xDE2A, 'splat': 0xDE45,
+          'climbDown': 0xDE72, 'climbUp': 0xDE90, 'extraLife': 0xDEAE}
 TITLE_MAP = 0xC7A6      # 20x20 title screen map ($8974 copies it to $2200)
 TITLE_TEXT_PTR_LO, TITLE_TEXT_PTR_HI, TITLE_TEXT_LEN = 0xF600, 0xF606, 0xF60C
 TITLE_TEXT_PAL = 0xF5FD     # palette per difficulty name
@@ -142,6 +146,20 @@ def rooms_data(palettes):
                       'palettes7800': palettes[r],
                       'palettesRGB': [['#%02x%02x%02x' % PAL[c] for c in pl] for pl in palettes[r]]})
     return rooms
+
+
+def sounds_data():
+    out = {}
+    for name, a in SOUNDS.items():
+        steps, p = [], a + 3
+        while True:
+            t = [rd(p), rd(p + 1), rd(p + 2)]
+            steps.append(t)
+            p += 3
+            if t == [0, 0, 0]:
+                break
+        out[name] = {'addr': '$%04X' % a, 'priority': rd(a + 1), 'frames': rd(a + 2), 'steps': steps}
+    return out
 
 
 def text_at(addr, n):
@@ -353,7 +371,9 @@ def main():
                'note': 'tiles[row][col] indexes assets/tiles.png (16 per row). Tiles are 1bpp; '
                        'draw them in colorRGB. Object codes: see docs/ROM_NOTES.md.',
                'rooms': rooms}, open(os.path.join(out, 'data/rooms.json'), 'w'), indent=1)
-    print('tiles: 128, sprites: %d, rooms: %d, doors: %d' % (n, len(rooms), sum(len(r['doors']) for r in rooms)))
+    json.dump({'note': 'TIA sound effects: steps are [AUDF, AUDC, AUDV]; each lasts frames+1 frames.',
+               'sounds': sounds_data()}, open(os.path.join(out, 'data/sounds.json'), 'w'), indent=1)
+    print('tiles: 128, sprites: %d, rooms: %d, doors: %d, sounds: %d' % (n, len(rooms), sum(len(r['doors']) for r in rooms), len(SOUNDS)))
 
 
 if __name__ == '__main__':

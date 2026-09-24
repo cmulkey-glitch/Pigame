@@ -32,6 +32,7 @@ platform file.
 - `src/game/state.js` + `room.js` — treasures, keys, doors opened by keys
 - `src/game/enemies.js` — ball, bird, chamber timer
 - `src/game/game.js` — title screen, chamber 0 / X rules, game over, escape ending
+- `src/game/sound.js` — the ROM's sound driver (TIA registers); `src/platform/tia-worklet.js` renders them
 
 Documented in `docs/PHYSICS.md` and `docs/ROM_NOTES.md`. Each is checked against traces
 recorded from the ROM:
@@ -42,4 +43,5 @@ python3 tools/trace_drops.py   path/to/Downland.a78
 python3 tools/trace_objects.py path/to/Downland.a78
 python3 tools/trace_enemies.py path/to/Downland.a78
 python3 tools/trace_rules.py   path/to/Downland.a78
+python3 tools/trace_sound.py   path/to/Downland.a78
 ```

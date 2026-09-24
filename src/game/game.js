@@ -9,6 +9,7 @@ import { Player } from './player.js';
 import { Drops, NO_DROPS } from './drops.js';
 import { Rng } from './rng.js';
 import { newGameState, collect } from './state.js';
+import { SoundDriver } from './sound.js';
 import { Ball, Bird, TIMER_FULL, TIMER_AFTER_BIRD_DEATH, TIMER_CHAMBER_X, returnTimer } from './enemies.js';
 
 const HUD_H = 8;
@@ -31,12 +32,14 @@ export class Game {
 
   async load(base = '.') {
     const p = this.p;
-    const [rooms, tileBmp, sprites, spriteBmp] = await Promise.all([
+    const [rooms, tileBmp, sprites, spriteBmp, sounds] = await Promise.all([
       p.loadJSON(base + '/data/rooms.json'),
       p.loadBitmap(base + '/assets/tiles.png'),
       p.loadJSON(base + '/assets/sprites.json'),
       p.loadBitmap(base + '/assets/sprites.png'),
+      p.loadJSON(base + '/data/sounds.json'),
     ]);
+    this.sound = new SoundDriver(sounds.sounds);
     this.defs = rooms.rooms;
     this.titleDef = rooms.title;
     this.doorOpenInitial = rooms.doorOpenInitial;
@@ -130,6 +133,7 @@ export class Game {
   }
 
   enterRoom(index, spawn, regenerating = false) {
+    this.sound?.stopAll();                                             // [$ADF3] chamber load
     this.roomIndex = index;
     this.room = new Room(this.defs[index], this.tiles);
     this.room.placeObjects(this.state);
@@ -171,7 +175,14 @@ export class Game {
   }
 
   update() {
+    this.updateGame();
+    // [$F83F] The ROM's sound driver runs every frame (from the NMI), in every mode.
+    this.p.audio?.setRegisters(this.sound.update());
+  }
+
+  updateGame() {
     const keys = this.p.input.takePressed();
+    if (keys.some((k) => k === 'm' || k === 'M')) this.p.audio?.toggle();
     // R / RESTART acts like the console's RESET switch ($83F0): back to the title.
     if (keys.some((k) => k === 'r' || k === 'R') && this.mode !== 'title') { this.toTitle(); return; }
     if (this.mode === 'title') { this.updateTitle(); return; }
@@ -221,6 +232,8 @@ export class Game {
       this.timer = Math.max(0, this.timer - 1);
       if (this.timer === 0) this.bird = new Bird();
     }
+    // [$BAC7] footstep every 16 frames while running
+    if (pl.running && !(this.frame & 0x0F)) this.sound.play('run');
     for (const ev of pl.events.splice(0)) {
       this.handle(ev);
       if (this.mode !== 'play') break;
@@ -229,12 +242,19 @@ export class Game {
 
   handle(ev) {
     const pl = this.player;
-    if (ev.type === 'pickup') {
+    if (ev.type === 'sound') {
+      if (ev.name === 'stop') this.sound.stopAll();
+      else this.sound.play(ev.name, ev.randomPitch ? this.rng.next() & 1 : 0);
+    } else if (ev.type === 'pickup') {
       const before = this.score;
       this.score += collect(this.state, this.room, ev, this.rng);
       if (ev.code === OBJ.KEY) this.keys++;
       // [$B363] Extra life when the ten-thousands digit changes, up to 5.
-      if (Math.floor(before / 10000) !== Math.floor(this.score / 10000) && pl.lives < 5) pl.lives++;
+      if (Math.floor(before / 10000) !== Math.floor(this.score / 10000) && pl.lives < 5) {
+        pl.lives++;
+        this.sound.play('extraLife');
+      }
+      this.sound.play('pickup');                                       // [$B396]
     } else if (ev.type === 'door') {
       this.goThroughDoor(ev.side);
     } else if (ev.type === 'respawn') {
@@ -277,6 +297,7 @@ export class Game {
   }
 
   endGame(mode) {
+    if (mode === 'escaped') this.sound.stopAll();                      // [$BF99]
     this.mode = mode;
     this.endTimer = GAME_OVER_FRAMES;
     this.escapeGuard = true;    // fire must be released, then pressed, to leave the ending

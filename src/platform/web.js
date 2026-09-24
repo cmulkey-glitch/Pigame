@@ -41,6 +41,26 @@ export async function createPlatform(canvas) {
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressed.push(el.dataset.press); });
   }
 
+  // Audio: a TIA synth in an AudioWorklet, fed the sound registers each frame. Browsers only
+  // allow audio after a user gesture, so it starts on the first key press or tap.
+  let audioCtx = null, tia = null, gain = null, lastRegs = '';
+  let soundOn = (() => { try { return localStorage.getItem('downland.sound') !== 'off'; } catch { return true; } })();
+  async function startAudio() {
+    if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+    try {
+      audioCtx = new AudioContext();
+      await audioCtx.audioWorklet.addModule(new URL('./tia-worklet.js', import.meta.url));
+      tia = new AudioWorkletNode(audioCtx, 'tia', { outputChannelCount: [1] });
+      gain = audioCtx.createGain();
+      gain.gain.value = soundOn ? 1 : 0;
+      tia.connect(gain).connect(audioCtx.destination);
+      lastRegs = '';
+    } catch (err) {
+      console.warn('No sound:', err);
+    }
+  }
+  for (const type of ['pointerdown', 'keydown']) addEventListener(type, startAudio, { capture: true });
+
   function loadImage(url) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -83,6 +103,22 @@ export async function createPlatform(canvas) {
     storage: {
       get(key) { try { return localStorage.getItem(key); } catch { return null; } },
       set(key, value) { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
+    },
+
+    audio: {
+      // regs: [{ f, c, v }, { f, c, v }] = AUDF / AUDC / AUDV for TIA channels 0 and 1
+      setRegisters(regs) {
+        if (!tia) return;
+        const key = regs.map((r) => `${r.f},${r.c},${r.v}`).join('|');
+        if (key !== lastRegs) { lastRegs = key; tia.port.postMessage(regs.map((r) => ({ ...r }))); }
+      },
+      get enabled() { return soundOn; },
+      toggle() {
+        soundOn = !soundOn;
+        if (gain) gain.gain.value = soundOn ? 1 : 0;
+        try { localStorage.setItem('downland.sound', soundOn ? 'on' : 'off'); } catch { /* ignore */ }
+        return soundOn;
+      },
     },
 
     input: {

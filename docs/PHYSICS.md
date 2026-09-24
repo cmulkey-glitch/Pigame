@@ -163,6 +163,19 @@ Frame f = head `$E02F + 8f`, legs 4 bytes later (320C). `assets/sprites.json →
   title (`$C58B`).
 - Game over: "GAME OVER" for 120 frames (`$C63F`), high score kept (`$BB43`), then the title.
 
+## Sound (`$F8D9`, `$F83F`) — `src/game/sound.js`, `src/platform/tia-worklet.js`
+- 8 effects (`data/sounds.json`): 7800basic format, header (version, priority, frames per
+  step) then `AUDF, AUDC, AUDV` triples ending 0,0,0; each step lasts frames + 1 frames.
+- `playsfx`: free channel first; if both busy and the new sound's priority isn't 0, replace
+  channel 1 when channel 0's priority ≥ channel 1's, else channel 0. Priority decays 1 per step.
+- Triggers: jump `$C2E6`, wall bump `$C041`, footstep every 16 frames while running `$BAC7`,
+  climb up on odd lines / climb down when y bit 1 is set (random 0/1 pitch offset) `$B579`,
+  pickup `$B396`, extra life `$B371`, splat `$B847`/`$C13D`. Stop-all `$F832` on every
+  landing, chamber load, game start and the escape ending.
+- The chamber-reveal hum (`$8784`) isn't ported: chambers appear instantly in this port.
+- The web platform renders the registers with a TIA synth (31.4 kHz clock, AUDF divider,
+  pure / div-31 / poly4 / poly5 / poly9 waveforms).
+
 Everything in the ROM's game loop is now ported.
 
 ## Port additions (not in the ROM)
