@@ -236,7 +236,7 @@ export class Player {
 
   // [$B812] Death. On a rope: drop. In the air: flicker for $2C frames, then fall and splat.
   kill() {
-    if (this.dead || this.regen) return;
+    if (this.dead) return;
     this.dead = true;
     this.splat = 0;
     if (this.climbing) { this.climbing = false; this.hanging = false; this.air = true; }
@@ -259,7 +259,7 @@ export class Player {
     if (--this.splat) return;
     this.dead = false;
     this.lives--;
-    if (this.lives) this.regen = true;   // regenerates where it died
+    if (this.lives) { this.regen = true; this.emit('respawn'); }   // regenerates where it died
     else this.emit('gameover');
   }
 

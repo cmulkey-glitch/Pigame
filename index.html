@@ -22,41 +22,43 @@
     font: 14px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     padding-inline: 16px; box-sizing: border-box;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    overscroll-behavior: none;
   }
   #stage {
-    max-width: 1100px; margin-inline: auto;
-    display: grid; gap: 14px; padding-block: 12px;
-    grid-template-columns: 1fr; grid-template-areas: "screen" "controls" "system" "help";
+    max-width: 1100px; min-height: 100%; margin-inline: auto; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 12px;
+    padding-block: 12px calc(20px + env(safe-area-inset-bottom, 0px));
   }
   canvas {
-    grid-area: screen; justify-self: center;
+    align-self: center;
     width: 100%; max-width: 960px; aspect-ratio: 320 / 200; image-rendering: pixelated;
     background: #000;
   }
   .touch { display: none; }
-  .controls { grid-area: controls; justify-content: space-between; align-items: center; gap: 16px; }
-  .dpad { display: grid; gap: 8px; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 52px); }
+  /* Thumb controls sit at the bottom of the screen. */
+  .controls { margin-top: auto; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .dpad { display: grid; gap: 8px; grid-template-columns: repeat(3, 66px); grid-template-rows: repeat(3, 60px); }
   button {
     font: inherit; color: var(--ink); background: var(--pad);
-    border: 1px solid var(--pad-edge); border-radius: 10px;
+    border: 1px solid var(--pad-edge); border-radius: 12px;
     touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
   button.down { background: var(--pad-down); }
   button:focus-visible { outline: 2px solid var(--jump); outline-offset: 2px; }
-  .dpad button { font-size: 20px; }
+  .dpad button { font-size: 22px; }
   .dpad [data-hold="up"] { grid-column: 2; grid-row: 1; }
   .dpad [data-hold="left"] { grid-column: 1; grid-row: 2; }
   .dpad [data-hold="right"] { grid-column: 3; grid-row: 2; }
   .dpad [data-hold="down"] { grid-column: 2; grid-row: 3; }
   .jump {
-    width: 104px; height: 104px; border-radius: 50%;
+    width: 116px; height: 116px; border-radius: 50%; margin-bottom: 12px;
     background: var(--jump); color: var(--jump-ink); border-color: var(--jump);
     font-weight: 700; letter-spacing: .08em;
   }
   .jump.down { background: var(--jump); filter: brightness(.75); }
-  .system { grid-area: system; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .system { flex-wrap: wrap; gap: 8px; justify-content: center; }
   .system button { padding: 8px 12px; font-size: 12px; color: var(--ink-dim); letter-spacing: .06em; }
-  #help { grid-area: help; color: var(--ink-dim); max-width: 960px; justify-self: center; text-align: center; }
+  #help { color: var(--ink-dim); max-width: 960px; align-self: center; text-align: center; }
   kbd { background: var(--pad); border: 1px solid var(--pad-edge); border-radius: 3px; padding: 0 4px; }
 
   /* Phones and tablets: on-screen controls instead of keyboard help. */
@@ -64,14 +66,17 @@
     .touch { display: flex; }
     #help { display: none; }
   }
-  /* Landscape phone: d-pad and jump either side of the screen. */
+  /* Landscape phone: screen in the middle, d-pad and jump low on either side. */
   @media (pointer: coarse) and (orientation: landscape) {
     #stage {
-      grid-template-columns: auto 1fr auto; grid-template-areas: "dpad screen jump" "system system system";
-      align-items: center; padding-block: 6px; gap: 10px;
+      display: grid; grid-template-columns: auto 1fr auto;
+      grid-template-areas: "dpad screen jump" "dpad system jump";
+      align-items: end; gap: 8px 12px;
+      padding-block: 6px calc(12px + env(safe-area-inset-bottom, 0px));
     }
-    /* Fit the height, or the width left after the d-pad (196px), jump (104px), gaps and gutters. */
-    canvas { width: auto; height: min(100vh - 70px, (100vw - 352px) * 0.625); }
+    /* Fit the height, or the width left after the d-pad (214px), jump (116px), gaps and gutters. */
+    canvas { grid-area: screen; width: auto; height: min(100vh - 64px, (100vw - 386px) * 0.625); align-self: start; }
+    .system { grid-area: system; }
     .controls { display: contents; }
     .dpad { grid-area: dpad; }
     .jump { grid-area: jump; }
@@ -81,6 +86,12 @@
 <body>
 <div id="stage">
   <canvas id="screen" width="320" height="200" aria-label="Downland"></canvas>
+  <div class="system touch">
+    <button id="sys-prev" data-press="[">◀ CHAMBER</button>
+    <button id="sys-next" data-press="]">CHAMBER ▶</button>
+    <button id="sys-diff" data-press="d">DIFFICULTY</button>
+    <button id="sys-restart" data-press="r">RESTART</button>
+  </div>
   <div class="controls touch">
     <div class="dpad" aria-label="Direction pad">
       <button id="pad-up" data-hold="up" aria-label="Climb up">▲</button>
@@ -89,12 +100,6 @@
       <button id="pad-down" data-hold="down" aria-label="Climb down">▼</button>
     </div>
     <button id="pad-jump" class="jump" data-hold="jump">JUMP</button>
-  </div>
-  <div class="system touch">
-    <button id="sys-prev" data-press="[">◀ CHAMBER</button>
-    <button id="sys-next" data-press="]">CHAMBER ▶</button>
-    <button id="sys-diff" data-press="d">DIFFICULTY</button>
-    <button id="sys-restart" data-press="r">RESTART</button>
   </div>
   <div id="help">
     <kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> climb rope · <kbd>Space</kbd> jump ·

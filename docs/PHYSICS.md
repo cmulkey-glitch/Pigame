@@ -123,5 +123,28 @@ Frame f = head `$E02F + 8f`, legs 4 bytes later (320C). `assets/sprites.json →
   the same point (`$C47D`).
 - Random numbers: 7800basic's 16-bit LFSR (`$FA67`, `src/game/rng.js`).
 
+## Ball (`$B161`) — `src/game/enemies.js`
+- Chambers 0, 2, 5, 6 (start `$F5B3/$F5BE`). Moves on ticks 1 and 3, skipping tick 3 when
+  `$E6 & 4` (3 steps per 8 frames). Each step: x − 1, `y −= vy`, `vy −= 1`; past x `$0C` it
+  restarts at its start with vy = 1.
+- Floors are hardcoded: all chambers bounce at y `$BF` (vy 4); chamber 0 also on y `$90` right
+  of x `$68` (vy 5), chamber 5 on y `$90` right of `$48` (vy 5), chamber 2 on y `$A0` right of
+  `$60` and y `$B0` right of `$48` (vy 4).
+- Hit (`$B7F0`, tick 2, not while regenerating): `(px+6−x) & $FF < 10`, `(py+14−y) & $FF < 22`.
+
+## Chamber timer and bird (`$8584`, `$85D2`)
+- Timer (BCD `$01AA/$01AB`) starts at 4096 in a new chamber (9999 in chamber X) and counts
+  down 1 per frame (every other frame on difficulty 0), paused while regenerating or while
+  the bird is out.
+- Going straight back through a door to the chamber you came from (`$8710`): timer = that
+  chamber's time when you left it + (4096 − current time); 4000 or more becomes 4096.
+- At 0000 the bird appears at (`$20`, `$17`) heading right-down. Every frame it moves 2 on
+  both axes (directions 1 right-up, 3 right-down, 5 left-down, 7 left-up) and turns
+  direction + 2 when outside x `$08–$90` / y `$08–$C0`.
+- Bird hit, every frame unless the player is dead (regenerating doesn't protect you):
+  `(px+6−x) & $FF < 14`, `(py+14−y) & $FF < 22`; on a hit the bird skips that frame's move.
+- When the splat after a death ends the bird is removed and, if the timer had run out, it
+  restarts at 2048 (4096 in chamber X). Changing chamber also removes the bird.
+
 ## Not ported yet
-Ball and bird (`$B161`, `$B7F0`), room timer (`$01AA/$01AB`), chamber-9 → X rule.
+Chamber 9 → X rule, title screen / difficulty select.

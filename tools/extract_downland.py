@@ -39,6 +39,9 @@ KEY_COL, KEY_ROW, KEY_DOOR = 0xF487, 0xF4B3, 0xF4DF                 # door+1 -> 
 DOOR_INIT = 0xF50B      # initial open state per door -> $24C2
 DROP_X_LO, DROP_X_HI, DROP_Y_LO, DROP_Y_HI = 0xF3D3, 0xF3DF, 0xF3EB, 0xF3F7  # index = chamber+1
 DROP_TWEAK = 0xF088     # difficulty 2 nudges this spawn point ($B087)
+BALL_X, BALL_Y = 0xF5B3, 0xF5BE   # ball start per chamber, x = 0 means no ball ($ACCF)
+EXTRA_SPRITES = [(0xBF, 1, 0, 3), (0xC0, 1, 0, 3),   # ball frames (320A, palette 3)
+                 (0xE6, 2, 0, 1), (0xE8, 2, 0, 1)]   # bird frames (320A, palette 1)
 PLAYER_BASE = 0x2F      # player frame f: head at $E02F + 8f, legs 4 bytes later (320C)
 PLAYER_FRAMES = 18
 
@@ -129,6 +132,7 @@ def rooms_data(palettes):
                       'tiles': tiles, 'tilePalette': pal, 'objects': objects, 'doors': doors,
                       'treasures': treasures, 'keys': keys, 'dropSpawns': drops,
                       'dropTweak': rd(DROP_TWEAK + r),
+                      'ball': {'x': rd(BALL_X + r), 'y': rd(BALL_Y + r)} if rd(BALL_X + r) else None,
                       'palettes7800': palettes[r],
                       'palettesRGB': [['#%02x%02x%02x' % PAL[c] for c in pl] for pl in palettes[r]]})
     return rooms
@@ -198,10 +202,13 @@ def collect_sprites(e, seen):
 
 
 def add_player_frames(seen):
-    """The player is 18 head/legs pairs at $E02F + 8*frame; make sure all are in the sheet."""
+    """The player is 18 head/legs pairs at $E02F + 8*frame; make sure all are in the sheet,
+    along with the ball and bird frames."""
     for f in range(PLAYER_FRAMES):
         for k in (0, 4):
             seen.setdefault((PLAYER_BASE + 8 * f + k, 4, 1), 4 if 8 <= f <= 11 else 0)
+    for lo, w, wm, pal in EXTRA_SPRITES:
+        seen.setdefault((lo, w, wm), pal)
 
 
 def sprite_sheet(seen, pals, img_path, json_path):
@@ -250,7 +257,10 @@ def sprite_sheet(seen, pals, img_path, json_path):
               for f in range(PLAYER_FRAMES)]
     json.dump({'note': 'Rows are 8 px; taller objects are stacked entries. Pixels are 320-mode (half width). '
                        'playerFrames[f] = [head, legs] sprite indexes; frame numbers in docs/PHYSICS.md.',
-               'playerFrames': frames, 'sprites': catalog}, open(json_path, 'w'), indent=1)
+               'playerFrames': frames,
+               'ballFrames': [index[('$E0BF', '320A')], index[('$E0C0', '320A')]],
+               'birdFrames': [index[('$E0E6', '320A')], index[('$E0E8', '320A')]],
+               'sprites': catalog}, open(json_path, 'w'), indent=1)
     return len(catalog)
 
 

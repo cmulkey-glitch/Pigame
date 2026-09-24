@@ -9,6 +9,7 @@ import { Player } from './player.js';
 import { Drops } from './drops.js';
 import { Rng } from './rng.js';
 import { newGameState, collect } from './state.js';
+import { Ball, Bird, TIMER_FULL, TIMER_AFTER_BIRD_DEATH, TIMER_CHAMBER_X, returnTimer } from './enemies.js';
 
 const HUD_H = 8;
 const toPx = (x) => x * 2 - 8;
@@ -25,6 +26,9 @@ export class Game {
     this.gameOver = false;
     this.difficulty = 1;   // $015F: 0..2, the ROM's default is 1
     this.rng = new Rng();
+    this.timer = TIMER_FULL;
+    this.prevRoom = -1;    // $0157 / $0159: chamber we came from and its timer when we left
+    this.prevTimer = 0;
   }
 
   newGameState() { return newGameState(this.defs, this.doorOpenInitial); }
@@ -44,6 +48,8 @@ export class Game {
     this.sprites = sprites.sprites;
     this.playerFrames = sprites.playerFrames;
     this.dropSprite = this.sprites.findIndex((sp) => sp.addr === '$E02E');
+    this.ballFrames = sprites.ballFrames;
+    this.birdFrames = sprites.birdFrames;
     this.spriteSheet = spriteBmp;
     this.surfaces = new Map();
     // Chamber 0 start: bottom floor, as the ROM places the player.
@@ -55,9 +61,19 @@ export class Game {
     this.room = new Room(this.defs[index], this.tiles);
     this.room.placeObjects(this.state);
     this.drops = new Drops(this.defs[index], index, this.difficulty, this.rng);
+    const ball = this.defs[index].ball;
+    this.ball = ball ? new Ball(ball, index) : null;
+    this.bird = null;      // [$8932] leaving a chamber clears the bird
     if (!this.surfaces.has(index)) this.surfaces.set(index, this.p.makeSurface(ROOM_W, ROOM_H, this.room.rgba));
     this.surface = this.surfaces.get(index);
     this.player.reset(spawn || this.defaultSpawn(), regenerating);
+  }
+
+  // Debug chamber select: fresh timer, no door history.
+  jumpToRoom(index) {
+    this.timer = index === 10 ? TIMER_CHAMBER_X : TIMER_FULL;
+    this.prevRoom = -1;
+    this.enterRoom(index);
   }
 
   defaultSpawn() {
@@ -69,6 +85,7 @@ export class Game {
     this.player = new Player();
     this.score = 0; this.keys = 0; this.gameOver = false;
     this.state = this.newGameState();
+    this.timer = TIMER_FULL; this.prevRoom = -1;
     this.enterRoom(0, { x: 0x88, y: 0xB7, facing: FACE_RIGHT }, true);
   }
 
@@ -76,22 +93,38 @@ export class Game {
     const { input } = this.p;
     for (const k of input.takePressed()) {
       const n = this.defs.length;
-      if (k === ']') this.enterRoom((this.roomIndex + 1) % n);
-      else if (k === '[') this.enterRoom((this.roomIndex + n - 1) % n);
-      else if (k >= '0' && k <= '9') this.enterRoom(+k);
-      else if (k === 'x' || k === 'X') this.enterRoom(10);
+      if (k === ']') this.jumpToRoom((this.roomIndex + 1) % n);
+      else if (k === '[') this.jumpToRoom((this.roomIndex + n - 1) % n);
+      else if (k >= '0' && k <= '9') this.jumpToRoom(+k);
+      else if (k === 'x' || k === 'X') this.jumpToRoom(10);
       else if (k === 'r' || k === 'R') this.restart();
       else if (k === 'd' || k === 'D') { this.difficulty = (this.difficulty + 1) % 3; this.enterRoom(this.roomIndex); }
     }
     if (this.gameOver) return;
 
-    const pl = this.player;
-    // [$841F] Drop collision uses last frame's drop positions, before the player moves.
-    if (!pl.regen && !pl.dead && this.drops.hits(pl.x, pl.y)) pl.kill();
-    pl.update(this.room, input, this.frame);
-    this.drops.update(this.room);
-    for (const ev of pl.events.splice(0)) this.handle(ev);
+    // Same order as the ROM's main loop ($83F8). The frame counter is incremented first.
     this.frame = (this.frame + 1) & 0xFF;
+    const pl = this.player, tick = this.frame & 3;
+    if (!pl.regen && !pl.dead) {
+      if (this.drops.hits(pl.x, pl.y)) pl.kill();                                  // $B7A2
+      else if (tick === 2 && this.ball && this.ball.hits(pl.x, pl.y)) pl.kill();   // $B7F0
+    }
+    pl.update(this.room, input, this.frame);
+    this.drops.update(this.room);                                                  // $C300
+    if ((tick & 1) && this.ball) this.ball.update(this.frame);                    // $B161
+    if (this.bird) {                                                               // $85D2
+      if (!pl.dead && this.bird.hits(pl.x, pl.y)) pl.kill();   // a hit skips this frame's move
+      else this.bird.update();
+    }
+    // [$8584] Chamber timer: paused while regenerating or while the bird is out; half speed
+    // on difficulty 0. At zero the bird appears. (On the frame a splat ends, the ROM runs the
+    // timer before regeneration starts.)
+    const respawned = pl.events.some((e) => e.type === 'respawn');
+    if (!(pl.regen && !respawned) && !this.bird && (this.difficulty !== 0 || !(this.frame & 1))) {
+      this.timer = Math.max(0, this.timer - 1);
+      if (this.timer === 0) this.bird = new Bird();
+    }
+    for (const ev of pl.events.splice(0)) this.handle(ev);
   }
 
   handle(ev) {
@@ -106,7 +139,18 @@ export class Game {
       // [$BEA5] Match the door by row and wall side in the ROM's door table.
       const row = ((pl.y + 7) & 0xFF) >> 3;
       const door = this.room.def.doors.find((d) => d.at.side === ev.side && (d.at.raw & 0x7F) === row);
-      if (door) this.enterRoom(door.to, Room.doorSpawn(door.arrive));
+      if (!door) return;
+      // [$BF02] Timer: full for a new chamber, partly refunded going straight back.
+      const leaving = this.timer;
+      this.timer = door.to === this.prevRoom ? returnTimer(this.prevTimer, leaving) : TIMER_FULL;
+      if (door.to === 10) this.timer = TIMER_CHAMBER_X;   // [$BFD1]
+      this.prevRoom = this.roomIndex;
+      this.prevTimer = leaving;
+      this.enterRoom(door.to, Room.doorSpawn(door.arrive));
+    } else if (ev.type === 'respawn') {
+      // [$B9B8] After a death the bird is gone; if it had come out, the timer restarts at 2048.
+      this.bird = null;
+      if (this.timer === 0) this.timer = this.roomIndex === 10 ? TIMER_FULL : TIMER_AFTER_BIRD_DEATH;
     } else if (ev.type === 'gameover') {
       this.gameOver = true;
     }
@@ -148,6 +192,8 @@ export class Game {
       this.drawBits(this.tiles[o.code >> 1], TILE_W, TILE_H, o.col * TILE_W, HUD_H + o.row * TILE_H, color);
     }
     for (const d of this.drops.visible()) this.sprite(this.dropSprite, toPx(d.x), d.y);
+    if (this.ball) this.sprite(this.ballFrames[this.ball.frame(this.frame)], toPx(this.ball.x), this.ball.y);
+    if (this.bird) this.sprite(this.birdFrames[this.bird.frame(this.frame)], toPx(this.bird.x), this.bird.y);
 
     const pl = this.player;
     const [head, legs] = this.playerFrames[pl.frame(this.frame)];
@@ -156,7 +202,8 @@ export class Game {
 
     g.rect(0, 0, 320, HUD_H, '#000');
     this.text(String(this.score).padStart(6, '0'), 0, 0, pal[7][2]);
-    this.text('L' + pl.lives + ' K' + this.keys + ' D' + this.difficulty, 64, 0, pal[4][2]);
+    this.text('L' + pl.lives + ' K' + this.keys + ' D' + this.difficulty, 56, 0, pal[4][2]);
+    this.text(String(this.timer).padStart(4, '0'), 144, 0, this.timer < 500 ? pal[4][2] : pal[7][2]);
     const title = this.gameOver ? 'GAME OVER R' : def.name;
     this.text(title, 320 - 8 * title.length, 0, pal[7][2]);
   }

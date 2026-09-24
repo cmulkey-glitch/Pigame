@@ -30,6 +30,7 @@ platform file.
 - `src/game/player.js` — walk, jump, fall, ropes, hanging, death, animation
 - `src/game/drops.js` — acid drops; `src/game/rng.js` — the ROM's random numbers
 - `src/game/state.js` + `room.js` — treasures, keys, doors opened by keys
+- `src/game/enemies.js` — ball, bird, chamber timer
 
 Documented in `docs/PHYSICS.md` and `docs/ROM_NOTES.md`. Each is checked against traces
 recorded from the ROM:
@@ -38,4 +39,5 @@ for t in tests/*.test.mjs; do node $t; done      # all must pass, no ROM needed
 python3 tools/trace_player.py  path/to/Downland.a78   # re-record traces from the ROM
 python3 tools/trace_drops.py   path/to/Downland.a78
 python3 tools/trace_objects.py path/to/Downland.a78
+python3 tools/trace_enemies.py path/to/Downland.a78
 ```
