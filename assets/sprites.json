@@ -1,0 +1,555 @@
+{
+ "note": "Rows are 8 px; taller objects are stacked entries. Pixels are 320-mode (half width).",
+ "sprites": [
+  {
+   "addr": "$E02E",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 6,
+   "x": 0,
+   "y": 0,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E02F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 10,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E033",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 28,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E037",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 46,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E03B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 64,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E03F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 82,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E043",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 100,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E047",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 118,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E04B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 136,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E04F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 154,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E053",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 172,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E057",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 190,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E05B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 208,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E05F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 226,
+   "y": 0,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E063",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 0,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E067",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 18,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E06B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 36,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E06F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 54,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E073",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 72,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E077",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 90,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E07B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 108,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E07F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 126,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E083",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 144,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E087",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 162,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E08B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 4,
+   "x": 180,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E097",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 198,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E09B",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 216,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E09F",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 234,
+   "y": 10,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0A3",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 0,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0A7",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 18,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0AB",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 36,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0AF",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 54,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0B3",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 72,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0B7",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 90,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0BB",
+   "bytes": 4,
+   "mode": "320C",
+   "palette": 0,
+   "x": 108,
+   "y": 20,
+   "w": 16,
+   "h": 8
+  },
+  {
+   "addr": "$E0BF",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 3,
+   "x": 126,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C0",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 3,
+   "x": 136,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C1",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 146,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C2",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 156,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C3",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 166,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C4",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 176,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C5",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 186,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C6",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 196,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C7",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 206,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C8",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 216,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0C9",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 226,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0CA",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 236,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0CC",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 246,
+   "y": 20,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0CD",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 0,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0CE",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 10,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0D0",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 20,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0D3",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 30,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0D8",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 40,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0DD",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 50,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  },
+  {
+   "addr": "$E0E3",
+   "bytes": 1,
+   "mode": "320A",
+   "palette": 7,
+   "x": 60,
+   "y": 30,
+   "w": 8,
+   "h": 8
+  }
+ ]
+}
