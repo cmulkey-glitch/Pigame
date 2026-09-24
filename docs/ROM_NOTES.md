@@ -30,8 +30,8 @@ Source: `Downland_03242025_a7800_fix.a78` (not in the repo — `*.a78` is gitign
 
 Tile codes are even (double-byte chars); `tiles.png` index = code / 2.
 Codes `$1A $1C $1E $20 $22 $24` are object markers — the loader blanks them and the
-game spawns the object instead (`$20` diamond, `$22` gold ring, `$24` key; `$1A–$1E` still
-to be identified). They are listed per chamber in `data/rooms.json` → `objects`.
+game draws the object instead: `$1A–$1E` door graphics, `$20` diamond, `$22` gold ring,
+`$24` key. They are listed per chamber in `data/rooms.json` → `objects`.
 
 ## Doors
 36 doors total. Per chamber n, doors are `$F55F[n] .. $F55F[n+1]-1`.

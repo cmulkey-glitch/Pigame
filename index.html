@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Downland Chamber Viewer</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #000; color: #bbb; font: 14px/1.4 system-ui, sans-serif;
+         display: flex; flex-direction: column; align-items: center; }
+  canvas { width: min(960px, 100vw); aspect-ratio: 320 / 200; image-rendering: pixelated;
+           background: #000; margin-top: 12px; }
+  #help { max-width: 960px; padding: 8px 16px; }
+  kbd { background: #222; border: 1px solid #444; border-radius: 3px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="320" height="200"></canvas>
+<div id="help">
+  <kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> climb rope · <kbd>Space</kbd> jump ·
+  <kbd>[</kbd><kbd>]</kbd> or <kbd>0</kbd>–<kbd>9</kbd>, <kbd>X</kbd> pick chamber ·
+  <kbd>G</kbd> toggle collision view · walk off the edge at a door to change chamber
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

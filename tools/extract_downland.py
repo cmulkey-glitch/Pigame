@@ -30,7 +30,7 @@ DOOR_POS = 0xF53B       # door position in its own chamber (bit7 = right wall, l
 DOOR_ENTRY = 0xF56B     # arrival position in the destination chamber (same encoding)
 DOOR_DEST = 0xF58F      # destination chamber
 REC_HI, REC_LO = 0x895C, 0x8968  # per-chamber loader (RTS jump table, index = chamber + 1)
-OBJECT_CODES = {0x1A, 0x1C, 0x1E, 0x20, 0x22, 0x24}  # map cells the loader blanks and spawns as objects
+OBJECT_CODES = {0x1A, 0x1C, 0x1E, 0x20, 0x22, 0x24}  # doors ($1A-$1E) and items; the loader blanks these cells
 NUM_ROOMS = 11          # chambers 0-9 plus the bonus chamber (shown as "X")
 
 
@@ -109,7 +109,8 @@ def rooms_data(palettes):
                       'mapAddr': '$%04X' % base, 'color7800': color,
                       'colorRGB': '#%02x%02x%02x' % PAL[color],
                       'tiles': tiles, 'tilePalette': pal, 'objects': objects, 'doors': doors,
-                      'palettes7800': palettes[r]})
+                      'palettes7800': palettes[r],
+                      'palettesRGB': [['#%02x%02x%02x' % PAL[c] for c in pl] for pl in palettes[r]]})
     return rooms
 
 
