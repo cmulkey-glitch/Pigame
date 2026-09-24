@@ -55,14 +55,39 @@ export class Room {
         }
       }
     }
-    // Tile codes as the ROM's collision sees them (RAM map at $2200): terrain codes plus
-    // uncollected items and open doors. Closed doors would be wall codes $08/$0A; the viewer
-    // keeps every door open until key logic is ported.
+    // Tile codes as the ROM's collision sees them (RAM map at $2200). Terrain comes from the
+    // chamber map (object cells already blank); placeObjects() adds items, keys and doors.
     this.codes = new Uint8Array(MAP_W * MAP_H);
     for (let row = 0; row < MAP_H; row++)
       for (let col = 0; col < MAP_W; col++) this.codes[row * MAP_W + col] = def.tiles[row][col] * 2;
-    for (const o of def.objects) this.codes[o.row * MAP_W + o.col] = o.code;
-    this.doorTiles = def.objects.filter((o) => o.code < OBJ.DIAMOND);
+  }
+
+  // [$AE4F] Write the chamber's objects from game state into the map: uncollected treasures
+  // and keys, and each door open ($1A/$1C/$1E) or closed (wall $08 left, $0A right).
+  placeObjects(state) {
+    for (const t of this.def.treasures)
+      this.setCell(t.col, t.row, state.treasure[t.slot]);
+    for (const k of this.def.keys)
+      this.setCell(k.col, k.row, state.keyDoor[k.slot] ? OBJ.KEY : 0);
+    for (const d of this.def.doors) this.setDoor(d.id, state.doorOpen[d.id]);
+  }
+
+  // [$AEFD / $B4AE] Door cells: column 0 or 18, three rows ending at the door's row.
+  setDoor(id, open) {
+    const d = this.def.doors.find((door) => door.id === id);
+    if (!d) return;
+    const col = d.at.side === 'right' ? 18 : 0, row = d.at.raw & 0x7F;
+    const closed = d.at.side === 'right' ? 0x0A : 0x08;
+    const codes = open ? [OBJ.DOOR_BOT, OBJ.DOOR_MID, OBJ.DOOR_TOP] : [closed, closed, closed];
+    codes.forEach((c, i) => this.setCell(col, row - i, c));
+  }
+
+  setCell(col, row, code) {
+    if (col < MAP_W && row < MAP_H) this.codes[row * MAP_W + col] = code;
+  }
+
+  cellAt(x, y) {
+    return { col: ((x - 4) & 0xFF) >> 3, row: ((y - 8) & 0xFF) >> 3 };
   }
 
   // Tile code under a point in 7800 coordinates ($C6F3): x = MARIA hpos, y = line with 0 at the
@@ -74,12 +99,16 @@ export class Room {
   }
 
   clearTileAt(x, y) {
-    const col = ((x - 4) & 0xFF) >> 3, row = ((y - 8) & 0xFF) >> 3;
-    if (col < MAP_W && row < MAP_H) this.codes[row * MAP_W + col] = 0;
+    const { col, row } = this.cellAt(x, y);
+    this.setCell(col, row, 0);
   }
 
-  // Uncollected items still in the map, for drawing.
-  *items() {
+  // Objects currently in the map (items, open doors, closed-door walls), for drawing.
+  *objects() {
+    for (const d of this.def.doors) {
+      const col = d.at.side === 'right' ? 18 : 0, row = d.at.raw & 0x7F;
+      for (let r = row - 2; r <= row; r++) yield { code: this.codes[r * MAP_W + col], col, row: r };
+    }
     for (let i = 0; i < this.codes.length; i++)
       if (this.codes[i] >= OBJ.DIAMOND && this.codes[i] <= OBJ.KEY)
         yield { code: this.codes[i], col: i % MAP_W, row: Math.floor(i / MAP_W) };

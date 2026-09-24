@@ -32,6 +32,13 @@ DOOR_DEST = 0xF58F      # destination chamber
 REC_HI, REC_LO = 0x895C, 0x8968  # per-chamber loader (RTS jump table, index = chamber + 1)
 OBJECT_CODES = {0x1A, 0x1C, 0x1E, 0x20, 0x22, 0x24}  # doors ($1A-$1E) and items; the loader blanks these cells
 NUM_ROOMS = 11          # chambers 0-9 plus the bonus chamber (shown as "X")
+NUM_DOORS = 36
+# Per-chamber object slots (4 per chamber, $FF = unused), copied to RAM at game start ($853C).
+TREASURE_COL, TREASURE_ROW, TREASURE_CODE = 0xF403, 0xF42F, 0xF45B   # code -> $246A
+KEY_COL, KEY_ROW, KEY_DOOR = 0xF487, 0xF4B3, 0xF4DF                 # door+1 -> $2496
+DOOR_INIT = 0xF50B      # initial open state per door -> $24C2
+DROP_X_LO, DROP_X_HI, DROP_Y_LO, DROP_Y_HI = 0xF3D3, 0xF3DF, 0xF3EB, 0xF3F7  # index = chamber+1
+DROP_TWEAK = 0xF088     # difficulty 2 nudges this spawn point ($B087)
 PLAYER_BASE = 0x2F      # player frame f: head at $E02F + 8f, legs 4 bytes later (320C)
 PLAYER_FRAMES = 18
 
@@ -107,10 +114,21 @@ def rooms_data(palettes):
         doors = [{'id': d, 'at': door_pos(rd(DOOR_POS + d)), 'to': rd(DOOR_DEST + d),
                   'arrive': door_pos(rd(DOOR_ENTRY + d))} for d in range(d0, d1)]
         color = rd(ROOM_COLOR + r)
+        slots = range(r * 4, r * 4 + 4)
+        treasures = [{'slot': i, 'col': rd(TREASURE_COL + i), 'row': rd(TREASURE_ROW + i),
+                      'code': rd(TREASURE_CODE + i)} for i in slots if rd(TREASURE_COL + i) != 0xFF]
+        keys = [{'slot': i, 'col': rd(KEY_COL + i), 'row': rd(KEY_ROW + i), 'door': rd(KEY_DOOR + i) - 1}
+                for i in slots if rd(KEY_COL + i) != 0xFF]
+        # Raw bytes the ROM reads: chamber 8 uses 64 points but its tables are 32 apart.
+        xp = rd(DROP_X_LO + r + 1) | rd(DROP_X_HI + r + 1) << 8
+        yp = rd(DROP_Y_LO + r + 1) | rd(DROP_Y_HI + r + 1) << 8
+        drops = [[rd(xp + i), rd(yp + i)] for i in range(64 if r == 8 else 32)]
         rooms.append({'id': r, 'name': 'CHAMBER %s' % ('X' if r == 10 else r),
                       'mapAddr': '$%04X' % base, 'color7800': color,
                       'colorRGB': '#%02x%02x%02x' % PAL[color],
                       'tiles': tiles, 'tilePalette': pal, 'objects': objects, 'doors': doors,
+                      'treasures': treasures, 'keys': keys, 'dropSpawns': drops,
+                      'dropTweak': rd(DROP_TWEAK + r),
                       'palettes7800': palettes[r],
                       'palettesRGB': [['#%02x%02x%02x' % PAL[c] for c in pl] for pl in palettes[r]]})
     return rooms
@@ -277,6 +295,7 @@ def main():
 
     rooms = rooms_data(pals)
     json.dump({'tileSize': [16, 8], 'mapSize': [MAP_W, MAP_H],
+               'doorOpenInitial': [rd(DOOR_INIT + d) for d in range(NUM_DOORS)],
                'note': 'tiles[row][col] indexes assets/tiles.png (16 per row). Tiles are 1bpp; '
                        'draw them in colorRGB. Object codes: see docs/ROM_NOTES.md.',
                'rooms': rooms}, open(os.path.join(out, 'data/rooms.json'), 'w'), indent=1)

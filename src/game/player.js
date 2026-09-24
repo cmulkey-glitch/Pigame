@@ -231,7 +231,7 @@ export class Player {
 
   pickUp(room, x, y, code) {
     room.clearTileAt(x, y);
-    this.emit('pickup', { code });
+    this.emit('pickup', { code, ...room.cellAt(x, y) });
   }
 
   // [$B812] Death. On a rope: drop. In the air: flicker for $2C frames, then fall and splat.

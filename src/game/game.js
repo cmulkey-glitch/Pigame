@@ -6,10 +6,12 @@
 
 import { Room, decodeTiles, glyphBits, ROOM_W, ROOM_H, TILE_W, TILE_H, OBJ, FACE_RIGHT } from './room.js';
 import { Player } from './player.js';
+import { Drops } from './drops.js';
+import { Rng } from './rng.js';
+import { newGameState, collect } from './state.js';
 
 const HUD_H = 8;
 const toPx = (x) => x * 2 - 8;
-const SCORE = { [OBJ.KEY]: 250, [OBJ.DIAMOND]: 350, [OBJ.RING]: 350 };  // + random 0..99 ($C74F)
 
 export class Game {
   constructor(platform) {
@@ -21,7 +23,11 @@ export class Game {
     this.keys = 0;
     this.frame = 0;
     this.gameOver = false;
+    this.difficulty = 1;   // $015F: 0..2, the ROM's default is 1
+    this.rng = new Rng();
   }
+
+  newGameState() { return newGameState(this.defs, this.doorOpenInitial); }
 
   async load(base = '.') {
     const p = this.p;
@@ -32,9 +38,12 @@ export class Game {
       p.loadBitmap(base + '/assets/sprites.png'),
     ]);
     this.defs = rooms.rooms;
+    this.doorOpenInitial = rooms.doorOpenInitial;
+    this.state = this.newGameState();
     this.tiles = decodeTiles(tileBmp);
     this.sprites = sprites.sprites;
     this.playerFrames = sprites.playerFrames;
+    this.dropSprite = this.sprites.findIndex((sp) => sp.addr === '$E02E');
     this.spriteSheet = spriteBmp;
     this.surfaces = new Map();
     // Chamber 0 start: bottom floor, as the ROM places the player.
@@ -44,6 +53,8 @@ export class Game {
   enterRoom(index, spawn, regenerating = false) {
     this.roomIndex = index;
     this.room = new Room(this.defs[index], this.tiles);
+    this.room.placeObjects(this.state);
+    this.drops = new Drops(this.defs[index], index, this.difficulty, this.rng);
     if (!this.surfaces.has(index)) this.surfaces.set(index, this.p.makeSurface(ROOM_W, ROOM_H, this.room.rgba));
     this.surface = this.surfaces.get(index);
     this.player.reset(spawn || this.defaultSpawn(), regenerating);
@@ -57,6 +68,7 @@ export class Game {
   restart() {
     this.player = new Player();
     this.score = 0; this.keys = 0; this.gameOver = false;
+    this.state = this.newGameState();
     this.enterRoom(0, { x: 0x88, y: 0xB7, facing: FACE_RIGHT }, true);
   }
 
@@ -69,11 +81,15 @@ export class Game {
       else if (k >= '0' && k <= '9') this.enterRoom(+k);
       else if (k === 'x' || k === 'X') this.enterRoom(10);
       else if ((k === 'r' || k === 'R') && this.gameOver) this.restart();
+      else if (k === 'd' || k === 'D') { this.difficulty = (this.difficulty + 1) % 3; this.enterRoom(this.roomIndex); }
     }
     if (this.gameOver) return;
 
     const pl = this.player;
+    // [$841F] Drop collision uses last frame's drop positions, before the player moves.
+    if (!pl.regen && !pl.dead && this.drops.hits(pl.x, pl.y)) pl.kill();
     pl.update(this.room, input, this.frame);
+    this.drops.update(this.room);
     for (const ev of pl.events.splice(0)) this.handle(ev);
     this.frame = (this.frame + 1) & 0xFF;
   }
@@ -81,8 +97,11 @@ export class Game {
   handle(ev) {
     const pl = this.player;
     if (ev.type === 'pickup') {
-      this.score += (SCORE[ev.code] || 0) + Math.floor(Math.random() * 100);
+      const before = this.score;
+      this.score += collect(this.state, this.room, ev, this.rng);
       if (ev.code === OBJ.KEY) this.keys++;
+      // [$B363] Extra life when the ten-thousands digit changes, up to 5.
+      if (Math.floor(before / 10000) !== Math.floor(this.score / 10000) && pl.lives < 5) pl.lives++;
     } else if (ev.type === 'door') {
       // [$BEA5] Match the door by row and wall side in the ROM's door table.
       const row = ((pl.y + 7) & 0xFF) >> 3;
@@ -122,12 +141,13 @@ export class Game {
     g.clear('#000');
 
     g.draw(this.surface, 0, HUD_H);
-    for (const o of this.room.doorTiles)
-      this.drawBits(this.tiles[o.code >> 1], TILE_W, TILE_H, o.col * TILE_W, HUD_H + o.row * TILE_H, pal[2][2]);
-    for (const it of this.room.items()) {
-      const color = it.code === OBJ.KEY ? pal[4][2] : it.code === OBJ.RING ? pal[2][2] : pal[5][2];
-      this.drawBits(this.tiles[it.code >> 1], TILE_W, TILE_H, it.col * TILE_W, HUD_H + it.row * TILE_H, color);
+    for (const o of this.room.objects()) {
+      if (!o.code) continue;
+      const color = o.code === OBJ.KEY ? pal[4][2] : o.code === OBJ.DIAMOND ? pal[5][2]
+        : o.code >= OBJ.DOOR_TOP ? pal[2][2] : pal[0][2];   // door / ring / closed-door wall
+      this.drawBits(this.tiles[o.code >> 1], TILE_W, TILE_H, o.col * TILE_W, HUD_H + o.row * TILE_H, color);
     }
+    for (const d of this.drops.visible()) this.sprite(this.dropSprite, toPx(d.x), d.y);
 
     const pl = this.player;
     const [head, legs] = this.playerFrames[pl.frame(this.frame)];
@@ -136,7 +156,7 @@ export class Game {
 
     g.rect(0, 0, 320, HUD_H, '#000');
     this.text(String(this.score).padStart(6, '0'), 0, 0, pal[7][2]);
-    this.text('L' + pl.lives + ' K' + this.keys, 64, 0, pal[4][2]);
+    this.text('L' + pl.lives + ' K' + this.keys + ' D' + this.difficulty, 64, 0, pal[4][2]);
     const title = this.gameOver ? 'GAME OVER R' : def.name;
     this.text(title, 320 - 8 * title.length, 0, pal[7][2]);
   }

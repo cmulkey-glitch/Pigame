@@ -41,10 +41,32 @@ game draws the object instead: `$1A–$1E` door graphics, `$20` diamond, `$22` g
 Position byte: bit 7 = right wall (x = `$8D`, else x = `$0B`), y = `(v & $7F) × 8 − 1`
 (decoded at `$BF5C`). Chamber 9 → X happens at `$BFB3` when bit 3 of `$FA` is set.
 
+## Items, keys and doors
+Per chamber 4 slots each (index = chamber×4 + n, `$FF` = unused), copied to RAM at game
+start (`$853C`) and kept across chambers:
+| ROM | RAM | what |
+|---|---|---|
+| `$F403` / `$F42F` | | treasure column / row |
+| `$F45B` | `$246A` | treasure code (`$20` diamond, `$22` ring), 0 once taken |
+| `$F487` / `$F4B3` | | key column / row |
+| `$F4DF` | `$2496` | door the key opens + 1, 0 once taken |
+| `$F50B` (36) | `$24C2` | door open flag |
+
+On chamber load (`$AE4F`) the objects are written into the RAM map; each door (`$AEFD`)
+fills 3 cells in column 0/18 ending at its row: `$1E $1C $1A` bottom-up if open, else wall
+`$08` (left) / `$0A` (right). Picking up a key (`$B41B`) opens its door and redraws it at once
+if it's in the current chamber. The door on the other side has its own flag.
+
+## Drops
+Traced in `docs/PHYSICS.md`. Spawn points: x table `$F3D3/$F3DF`, y table `$F3EB/$F3F7`
+(pointers, index = chamber+1), 32 entries (64 in chamber 8, whose tables overlap), copied
+to `$23EA`/`$242A`. Slots at `$24EE` x, `$24F6` y, `$24FE` timer, `$2506` spawn index
+(`$FF` = empty); `$0148` = last slot. Difficulty `$015F` (default 1).
+
 ## Player
 Movement, physics, death and animation are traced in `docs/PHYSICS.md`.
 
 ## Not yet traced
-- Drops, ball and bird behaviour and timings, per-chamber tables `$F5B3` / `$F5BE`.
-- Key → door unlocking (`$AExx`), room timer (`$01AA/$01AB`).
+- Ball and bird behaviour (`$B161`, `$B7F0`), per-chamber tables `$F5B3` / `$F5BE`.
+- Room timer (`$01AA/$01AB`), title-screen difficulty select, chamber 9 → X.
 - The emulator shows garbage in the score digits; the HUD path isn't traced yet.

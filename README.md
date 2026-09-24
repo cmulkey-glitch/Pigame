@@ -26,10 +26,16 @@ Layout: `src/platform/web.js` is the only browser-specific file (canvas, input, 
 frame loop). `src/game/` is plain JS game logic — a port to another system replaces the
 platform file.
 
-## Physics
-`src/game/player.js` is a port of the ROM's player code (walk, jump, fall, ropes, hanging,
-death, animation), documented in `docs/PHYSICS.md`. Check it against the ROM with:
+## Ported game logic
+- `src/game/player.js` — walk, jump, fall, ropes, hanging, death, animation
+- `src/game/drops.js` — acid drops; `src/game/rng.js` — the ROM's random numbers
+- `src/game/state.js` + `room.js` — treasures, keys, doors opened by keys
+
+Documented in `docs/PHYSICS.md` and `docs/ROM_NOTES.md`. Each is checked against traces
+recorded from the ROM:
 ```
-node tests/physics.test.mjs                 # replays tests/traces/*.json, must all pass
-python3 tools/trace_player.py path/to/Downland.a78   # re-record the traces from the ROM
+for t in tests/*.test.mjs; do node $t; done      # all must pass, no ROM needed
+python3 tools/trace_player.py  path/to/Downland.a78   # re-record traces from the ROM
+python3 tools/trace_drops.py   path/to/Downland.a78
+python3 tools/trace_objects.py path/to/Downland.a78
 ```

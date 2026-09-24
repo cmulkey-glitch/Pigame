@@ -41,8 +41,9 @@ const input = (s) => ({
 });
 
 let failed = 0;
-for (const file of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
+for (const file of readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('drops_')).sort()) {
   const t = JSON.parse(readFileSync(join(dir, file)));
+  if (!t.start || t.start.facing === undefined) continue;   // not a player trace
   const room = makeRoom(t.start.map);
   const p = loadPlayer(t.start);
   let bad = null;

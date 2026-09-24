@@ -108,6 +108,20 @@ Frame f = head `$E02F + 8f`, legs 4 bytes later (320C). `assets/sprites.json →
 | 14 / 15 | air or hanging, facing right / left; mid-air death flickers 14/15 on `$E6 & 4` |
 | 16 → 17 | splat |
 
+## Drops (`$C300`, every frame) — `src/game/drops.js`
+- 6 slots, or 8 after chamber 5 or on difficulty 2; difficulty 0 is always 6 (`$B0C4`).
+- On chamber load every slot picks a spawn point and waits (`$B0F5`).
+- Empty slot: 1-in-8 chance per frame (`rand & 7 == 0`) to respawn at spawn point
+  `rand & $1F` (`& $3F` in chamber 8), waiting `$38 + rand & 7` frames (+`$10` on difficulty 0).
+- Waiting drops count down and are harmless. Falling drops move **2 lines/frame**; a drop
+  is removed when `tile(x+1, y+2)` is floor but `tile(x+1, y+5)` isn't (it reached the line).
+- Difficulty 2 moves spawn point `$F088[chamber]` by x−2, y+2 and copies it to the point
+  before it (`$B087`).
+- Hit test (`$B7A2`, every frame before the player moves, skipped while regenerating/dead):
+  `(px + 6 − x) & $FF < 8` and `(py + 14 − y) & $FF < 18`.
+- Drawn with a 0–2 line random jitter; a waiting drop is hidden if an earlier slot waits on
+  the same point (`$C47D`).
+- Random numbers: 7800basic's 16-bit LFSR (`$FA67`, `src/game/rng.js`).
+
 ## Not ported yet
-Drops (`$C300`), ball and bird (`$B161`, `$B7F0`), room timer (`$01AA/$01AB`), doors
-locked until their key is collected (`$AExx`), chamber-9 → X rule.
+Ball and bird (`$B161`, `$B7F0`), room timer (`$01AA/$01AB`), chamber-9 → X rule.
