@@ -108,9 +108,9 @@ function Room_objects() as object
     return out
 end function
 
-function DoorSpawn(pos as object) as object
-    if pos.side = "right" then f = 1 else f = 2
-    return { x: pos.x, y: pos.y, facing: f }
+function DoorSpawn(arrive as object) as object
+    if arrive.side = "right" then f = 1 else f = 2
+    return { x: arrive.x, y: arrive.y, facing: f }
 end function
 
 ' ---- per-game object state ($853C) ----

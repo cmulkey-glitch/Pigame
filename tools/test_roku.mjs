@@ -1,5 +1,7 @@
 // Run tests/roku/tests.brs (the ROM trace checks) against roku/source with the brs
-// interpreter. Needs `npm install -g brs` or BRS=/path/to/brs.
+// interpreter, then compile-check roku/ with BrighterScript, whose parser matches the device
+// (brs accepts things the Roku compiler rejects, e.g. `pos` as a variable).
+// Needs `npm install -g brs brighterscript`, or BRS= / BSC= paths to the binaries.
 // Usage: node tools/test_roku.mjs
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -13,4 +15,9 @@ const brs = process.env.BRS || 'brs';
 const r = spawnSync(brs, ['--root', root, ...game, join(root, 'tests', 'roku', 'tests.brs')], { encoding: 'utf8' });
 process.stdout.write(r.stdout || '');
 process.stderr.write(r.stderr || '');
-process.exit(/ALL PASS/.test(r.stdout || '') ? 0 : 1);
+const bsc = spawnSync(process.env.BSC || 'bsc', ['--root-dir', join(root, 'roku'), '--create-package', 'false',
+  '--staging-dir', join(root, 'dist', 'bsc-staging')], { encoding: 'utf8' });
+const errors = (bsc.stdout || '') + (bsc.stderr || '');
+const compiled = bsc.status === 0 && !/ error /.test(errors);
+console.log(compiled ? 'ok   device compile check (bsc)' : 'FAIL device compile check (bsc)\n' + errors);
+process.exit(/ALL PASS/.test(r.stdout || '') && compiled ? 0 : 1);
