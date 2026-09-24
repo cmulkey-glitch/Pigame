@@ -142,11 +142,27 @@ export class Game {
     this.player.reset(spawn || this.defaultSpawn(), regenerating);
   }
 
-  // Debug chamber select: fresh timer, no door history.
+  // Playtest chamber select: fresh timer, no door history, player at the chamber's start.
   jumpToRoom(index) {
     this.timer = index === 10 ? TIMER_CHAMBER_X : TIMER_FULL;
     this.prevRoom = -1;
-    this.enterRoom(index);
+    this.enterRoom(index, this.startSpawn(index));
+  }
+
+  // Where a chamber is normally entered: chamber 0 is the game start; chamber X is the ESCAPE
+  // arrival from chamber 9 ($BF9F); any other chamber is the arrival point of the door into it
+  // from the lowest-numbered chamber that leads there (1 from 0, 5 from 2, 7 from 5, ...).
+  startSpawn(index) {
+    if (index === 0) return START;
+    if (index === 10) {
+      const d = this.defs[9].doors.find((door) => door.to === 0);
+      return { x: 0x0B, y: d.arrive.y, facing: FACE_RIGHT };
+    }
+    for (const def of this.defs) {
+      const d = def.id !== index && def.doors.find((door) => door.to === index);
+      if (d) return Room.doorSpawn(d.arrive);
+    }
+    return this.defaultSpawn();
   }
 
   defaultSpawn() {

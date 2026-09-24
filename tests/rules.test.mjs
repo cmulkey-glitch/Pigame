@@ -77,4 +77,18 @@ for (const c of cases) {
   check('beginner: entering chamber 0 keeps BEGINNER', game.roomIndex === 0 && game.beginner && game.difficulty === 0);
   check('beginner: still no drops after a new round', [...game.drops.visible()].length === 0);
 }
+// Playtest chamber select puts the player at each chamber's start, standing on floor.
+{
+  game.beginner = false; game.difficulty = 1;
+  game.startGame();
+  const bad = [];
+  for (let i = 0; i < game.defs.length; i++) {
+    game.jumpToRoom(i);
+    const p = game.player;
+    if (game.room.tileAt(p.x + 3, p.y + 15) !== 0x04) bad.push(i);
+  }
+  if (bad.length) failed++;
+  console.log(bad.length ? `FAIL chamber select: no floor under the player in ${bad.join(', ')}`
+                         : 'ok   chamber select: player starts on floor in all 11 chambers');
+}
 process.exit(failed ? 1 : 0);
