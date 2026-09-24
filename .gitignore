@@ -1,3 +1,4 @@
 *.a78
 *.bin
 __pycache__/
+dist/

@@ -32,7 +32,7 @@ platform file.
 - `src/game/state.js` + `room.js` — treasures, keys, doors opened by keys
 - `src/game/enemies.js` — ball, bird, chamber timer
 - `src/game/game.js` — title screen, chamber 0 / X rules, game over, escape ending
-- `src/game/sound.js` — the ROM's sound driver (TIA registers); `src/platform/tia-worklet.js` renders them
+- `src/game/sound.js` — the ROM's sound driver (TIA registers); `src/platform/tia-synth.js` renders them (in `tia-worklet.js` on the web)
 
 Documented in `docs/PHYSICS.md` and `docs/ROM_NOTES.md`. Each is checked against traces
 recorded from the ROM:
@@ -45,3 +45,19 @@ python3 tools/trace_enemies.py path/to/Downland.a78
 python3 tools/trace_rules.py   path/to/Downland.a78
 python3 tools/trace_sound.py   path/to/Downland.a78
 ```
+
+## Roku (sideload prototype)
+`roku/source/` is a BrightScript port of `src/game/` (`player.brs`, `world.brs`, `game.brs`)
+plus `main.brs` for the screen, remote and sound. Chamber art is pre-rendered, text and items
+are drawn from pre-tinted copies of the tile atlas, and sound effects are WAVs rendered by the
+same driver + TIA synth as the web (`tools/render_sounds.mjs`), since Roku can't synthesize.
+```
+node tools/test_roku.mjs          # the ROM trace checks against the BrightScript (npm i -g brs)
+python3 tools/build_roku.py       # -> dist/downland-roku.zip
+```
+Sideload: enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, Right),
+open `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press Install.
+
+Remote: arrows move / climb, OK or Play jumps (in the direction held or released in the last
+~12 frames — a Roku remote can't send direction + OK together), Back returns to the title
+(exits from the title), Rew / Fwd step through chambers (playtest).
