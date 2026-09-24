@@ -1,10 +1,10 @@
-// Chamber viewer: loads extracted data, runs the ported player logic, draws chamber + HUD.
+// Downland: title screen, play, game over and the escape ending, driving the ported logic.
 // Platform-agnostic: everything goes through the `platform` object (see src/platform/web.js).
 //
 // Game logic uses 7800 coordinates (x = hpos, y = line from the top of the HUD row). On the
 // 320x200 canvas that is px = x*2 - 8 (tile column c at 16c) and py = y (HUD row at 0).
 
-import { Room, decodeTiles, glyphBits, ROOM_W, ROOM_H, TILE_W, TILE_H, OBJ, FACE_RIGHT } from './room.js';
+import { Room, decodeTiles, glyphBits, ROOM_W, ROOM_H, TILE_W, TILE_H, OBJ, FACE_LEFT, FACE_RIGHT } from './room.js';
 import { Player } from './player.js';
 import { Drops } from './drops.js';
 import { Rng } from './rng.js';
@@ -13,25 +13,20 @@ import { Ball, Bird, TIMER_FULL, TIMER_AFTER_BIRD_DEATH, TIMER_CHAMBER_X, return
 
 const HUD_H = 8;
 const toPx = (x) => x * 2 - 8;
+const TITLE_GUARD = 30;        // $0147: frames before fire can start a game
+const GAME_OVER_FRAMES = 120;  // $0160
+const START = { x: 0x88, y: 0xB7, facing: FACE_LEFT };   // [$838D]
 
 export class Game {
   constructor(platform) {
     this.p = platform;
-    this.player = new Player();
-    this.room = null;
-    this.roomIndex = 0;
-    this.score = 0;
-    this.keys = 0;
-    this.frame = 0;
-    this.gameOver = false;
-    this.difficulty = 1;   // $015F: 0..2, the ROM's default is 1
     this.rng = new Rng();
-    this.timer = TIMER_FULL;
-    this.prevRoom = -1;    // $0157 / $0159: chamber we came from and its timer when we left
-    this.prevTimer = 0;
+    this.frame = 0;
+    this.difficulty = 1;        // $015F: 0 easy, 1 normal (power-on default), 2 hard
+    this.escapeMode = false;    // $FA bit 3: chamber 9's exit leads to chamber X
+    this.hiScore = Number(platform.storage?.get('downland.hi')) || 0;
+    this.mode = 'title';
   }
-
-  newGameState() { return newGameState(this.defs, this.doorOpenInitial); }
 
   async load(base = '.') {
     const p = this.p;
@@ -42,8 +37,8 @@ export class Game {
       p.loadBitmap(base + '/assets/sprites.png'),
     ]);
     this.defs = rooms.rooms;
+    this.titleDef = rooms.title;
     this.doorOpenInitial = rooms.doorOpenInitial;
-    this.state = this.newGameState();
     this.tiles = decodeTiles(tileBmp);
     this.sprites = sprites.sprites;
     this.playerFrames = sprites.playerFrames;
@@ -52,8 +47,81 @@ export class Game {
     this.birdFrames = sprites.birdFrames;
     this.spriteSheet = spriteBmp;
     this.surfaces = new Map();
-    // Chamber 0 start: bottom floor, as the ROM places the player.
-    this.enterRoom(0, { x: 0x88, y: 0xB7, facing: FACE_RIGHT }, true);
+    this.titleSurfaces = this.titleDef.flashRGB.map(([p0, p7]) => {
+      const palettesRGB = this.titleDef.palettesRGB.map((pl) => pl.slice());
+      palettesRGB[0][2] = p0; palettesRGB[7][2] = p7;
+      const room = new Room({ ...this.titleDef, palettesRGB }, this.tiles);
+      return { surface: this.p.makeSurface(ROOM_W, ROOM_H, room.rgba), palettesRGB };
+    });
+    this.toTitle();
+  }
+
+  // ---- title screen ($802A) ----
+
+  toTitle() {
+    this.mode = 'title';
+    this.titleGuard = TITLE_GUARD;
+    this.titleRoom = new Room(this.titleDef, this.tiles);
+    this.drops = new Drops(this.titleDef, -1, this.difficulty, this.rng);
+    this.stickWasMoved = true;   // $FA bit 2: wait for the stick to be released first
+  }
+
+  updateTitle() {
+    const { input } = this.p;
+    this.frame = (this.frame + 1) & 0xFF;
+    if (this.titleGuard) this.titleGuard--;
+    if (input.isDown('jump') && !this.titleGuard) { this.startGame(); return; }
+    // [$8110] One change per stick movement: left/right cycle difficulty, up/down the mode.
+    const l = input.isDown('left'), r = input.isDown('right');
+    const moved = l || r || input.isDown('up') || input.isDown('down');
+    if (moved && !this.stickWasMoved) {
+      if (!l && !r) this.escapeMode = !this.escapeMode;
+      else {
+        if (r) this.difficulty++;
+        if (l) this.difficulty--;
+        if (this.difficulty < 0) this.difficulty = 2;
+        if (this.difficulty > 2) this.difficulty = 0;
+      }
+    }
+    this.stickWasMoved = moved;
+    this.drops.update(this.titleRoom);
+  }
+
+  renderTitle() {
+    const g = this.p.gfx;
+    // [$80F0] every 64 frames the title colours flip
+    const { surface, palettesRGB: pal } = this.titleSurfaces[this.frame & 0x80 ? 0 : 1];
+    g.clear('#000');
+    g.draw(surface, 0, HUD_H);
+    for (const d of this.drops.visible()) this.sprite(this.dropSprite, toPx(d.x), d.y);
+    const t = this.titleDef;
+    // [$8181] difficulty between diamonds, mode between rings, centred on hpos $48
+    this.flanked(t.difficultyNames[this.difficulty], OBJ.DIAMOND, 0x82, pal[t.difficultyPalettes[this.difficulty]][2]);
+    this.flanked(t.modeNames[this.escapeMode ? 1 : 0], OBJ.RING, 0x8C, pal[2][2]);
+    const hi = 'HI ' + String(this.hiScore).padStart(6, '0');
+    this.text(hi, 320 - 8 * hi.length, 0, pal[7][2]);
+  }
+
+  flanked(word, tile, y, color) {
+    const x = toPx(0x48 - word.length * 2);
+    this.drawBits(this.tiles[tile >> 1], TILE_W, TILE_H, x, y, color);
+    this.text(word, x + TILE_W, y, color);
+    this.drawBits(this.tiles[tile >> 1], TILE_W, TILE_H, x + TILE_W + 8 * word.length, y, color);
+  }
+
+  // ---- play ----
+
+  startGame() {
+    this.mode = 'play';
+    this.player = new Player();
+    this.player.lives = this.difficulty === 0 ? 5 : 4;
+    this.score = 0; this.keys = 0;
+    this.state = newGameState(this.defs, this.doorOpenInitial);
+    this.timer = TIMER_FULL;
+    this.prevRoom = -1;    // $0157 / $0159: chamber we came from and its timer when we left
+    this.prevTimer = 0;
+    this.enterRoom(0, START, true);
+    this.player.jumpLatch = true;   // fire started the game: release it before jumping
   }
 
   enterRoom(index, spawn, regenerating = false) {
@@ -81,27 +149,35 @@ export class Game {
     return d ? Room.doorSpawn(d.at) : { x: 0x50, y: 0x1F, facing: FACE_RIGHT };
   }
 
-  restart() {
-    this.player = new Player();
-    this.score = 0; this.keys = 0; this.gameOver = false;
-    this.state = this.newGameState();
-    this.timer = TIMER_FULL; this.prevRoom = -1;
-    this.enterRoom(0, { x: 0x88, y: 0xB7, facing: FACE_RIGHT }, true);
-  }
-
   update() {
-    const { input } = this.p;
-    for (const k of input.takePressed()) {
+    const keys = this.p.input.takePressed();
+    // R / RESTART acts like the console's RESET switch ($83F0): back to the title.
+    if (keys.some((k) => k === 'r' || k === 'R') && this.mode !== 'title') { this.toTitle(); return; }
+    if (this.mode === 'title') { this.updateTitle(); return; }
+    if (this.mode === 'gameover') {
+      if (--this.endTimer === 0) this.toTitle();
+      return;
+    }
+    if (this.mode === 'escaped') {
+      // [$C62F] fire returns to the title (released first, so a held button doesn't skip it)
+      const fire = this.p.input.isDown('jump');
+      if (fire && !this.escapeGuard) this.toTitle();
+      else if (!fire) this.escapeGuard = false;
+      return;
+    }
+    for (const k of keys) {
       const n = this.defs.length;
       if (k === ']') this.jumpToRoom((this.roomIndex + 1) % n);
       else if (k === '[') this.jumpToRoom((this.roomIndex + n - 1) % n);
       else if (k >= '0' && k <= '9') this.jumpToRoom(+k);
       else if (k === 'x' || k === 'X') this.jumpToRoom(10);
-      else if (k === 'r' || k === 'R') this.restart();
       else if (k === 'd' || k === 'D') { this.difficulty = (this.difficulty + 1) % 3; this.enterRoom(this.roomIndex); }
     }
-    if (this.gameOver) return;
+    this.updatePlay();
+  }
 
+  updatePlay() {
+    const { input } = this.p;
     // Same order as the ROM's main loop ($83F8). The frame counter is incremented first.
     this.frame = (this.frame + 1) & 0xFF;
     const pl = this.player, tick = this.frame & 3;
@@ -124,7 +200,10 @@ export class Game {
       this.timer = Math.max(0, this.timer - 1);
       if (this.timer === 0) this.bird = new Bird();
     }
-    for (const ev of pl.events.splice(0)) this.handle(ev);
+    for (const ev of pl.events.splice(0)) {
+      this.handle(ev);
+      if (this.mode !== 'play') break;
+    }
   }
 
   handle(ev) {
@@ -136,25 +215,56 @@ export class Game {
       // [$B363] Extra life when the ten-thousands digit changes, up to 5.
       if (Math.floor(before / 10000) !== Math.floor(this.score / 10000) && pl.lives < 5) pl.lives++;
     } else if (ev.type === 'door') {
-      // [$BEA5] Match the door by row and wall side in the ROM's door table.
-      const row = ((pl.y + 7) & 0xFF) >> 3;
-      const door = this.room.def.doors.find((d) => d.at.side === ev.side && (d.at.raw & 0x7F) === row);
-      if (!door) return;
-      // [$BF02] Timer: full for a new chamber, partly refunded going straight back.
-      const leaving = this.timer;
-      this.timer = door.to === this.prevRoom ? returnTimer(this.prevTimer, leaving) : TIMER_FULL;
-      if (door.to === 10) this.timer = TIMER_CHAMBER_X;   // [$BFD1]
-      this.prevRoom = this.roomIndex;
-      this.prevTimer = leaving;
-      this.enterRoom(door.to, Room.doorSpawn(door.arrive));
+      this.goThroughDoor(ev.side);
     } else if (ev.type === 'respawn') {
       // [$B9B8] After a death the bird is gone; if it had come out, the timer restarts at 2048.
       this.bird = null;
       if (this.timer === 0) this.timer = this.roomIndex === 10 ? TIMER_FULL : TIMER_AFTER_BIRD_DEATH;
     } else if (ev.type === 'gameover') {
-      this.gameOver = true;
+      this.endGame('gameover');
     }
   }
+
+  // [$BEA5 / $BF02 / $BF44] Door transition, including the chamber 0 / chamber X rules.
+  goThroughDoor(side) {
+    const pl = this.player;
+    const row = ((pl.y + 7) & 0xFF) >> 3;
+    const door = this.room.def.doors.find((d) => d.at.side === side && (d.at.raw & 0x7F) === row);
+    if (!door) return;
+    const from = this.roomIndex;
+    let to = door.to, spawn = Room.doorSpawn(door.arrive);
+
+    // Timer: full for a new chamber, partly refunded going straight back.
+    const leaving = this.timer;
+    this.timer = to === this.prevRoom ? returnTimer(this.prevTimer, leaving) : TIMER_FULL;
+    this.prevRoom = from;
+    this.prevTimer = leaving;
+
+    if (to === 0) {
+      if (this.difficulty < 2) this.difficulty++;            // [$BF47] every entry into chamber 0
+      if (from === 10) { this.endGame('escaped'); return; }   // [$BF8B] out of chamber X: you escaped
+      if (from === 9 && this.escapeMode) {                    // [$BF9F] ESCAPE mode: on to chamber X
+        to = 10;
+        spawn = { x: 0x0B, y: spawn.y, facing: FACE_RIGHT };
+      } else if (from === 9) {                                // [$BFC0] LOOPING mode: new round
+        this.state = newGameState(this.defs, this.doorOpenInitial);
+      }
+    }
+    if (to === 10) this.timer = TIMER_CHAMBER_X;              // [$BFD1]
+    this.enterRoom(to, spawn);
+  }
+
+  endGame(mode) {
+    this.mode = mode;
+    this.endTimer = GAME_OVER_FRAMES;
+    this.escapeGuard = true;    // fire must be released, then pressed, to leave the ending
+    if (this.score > this.hiScore) {       // [$BB43] high score
+      this.hiScore = this.score;
+      this.p.storage?.set('downland.hi', String(this.hiScore));
+    }
+  }
+
+  // ---- drawing ----
 
   drawBits(bits, w, h, x, y, color) {
     const g = this.p.gfx;
@@ -179,6 +289,7 @@ export class Game {
   }
 
   render() {
+    if (this.mode === 'title') { this.renderTitle(); return; }
     const g = this.p.gfx;
     const def = this.room.def;
     const pal = def.palettesRGB;
@@ -204,7 +315,15 @@ export class Game {
     this.text(String(this.score).padStart(6, '0'), 0, 0, pal[7][2]);
     this.text('L' + pl.lives + ' K' + this.keys + ' D' + this.difficulty, 56, 0, pal[4][2]);
     this.text(String(this.timer).padStart(4, '0'), 144, 0, this.timer < 500 ? pal[4][2] : pal[7][2]);
-    const title = this.gameOver ? 'GAME OVER R' : def.name;
-    this.text(title, 320 - 8 * title.length, 0, pal[7][2]);
+    this.text(def.name, 320 - 8 * def.name.length, 0, pal[7][2]);
+
+    // [$C63F / $C58B] end screens, drawn over the frozen chamber in palette 7
+    const [you, escaped, gameOver] = this.titleDef.endText;
+    const ink = pal[7][2];
+    if (this.mode === 'gameover') this.text(gameOver, toPx(0x3E), 0x50, ink);
+    if (this.mode === 'escaped') {
+      this.text(you, toPx(0x4A), 0x50, ink);
+      this.text(escaped, toPx(0x42), 0x58, ink);
+    }
   }
 }

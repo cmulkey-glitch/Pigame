@@ -31,6 +31,7 @@ platform file.
 - `src/game/drops.js` — acid drops; `src/game/rng.js` — the ROM's random numbers
 - `src/game/state.js` + `room.js` — treasures, keys, doors opened by keys
 - `src/game/enemies.js` — ball, bird, chamber timer
+- `src/game/game.js` — title screen, chamber 0 / X rules, game over, escape ending
 
 Documented in `docs/PHYSICS.md` and `docs/ROM_NOTES.md`. Each is checked against traces
 recorded from the ROM:
@@ -40,4 +41,5 @@ python3 tools/trace_player.py  path/to/Downland.a78   # re-record traces from th
 python3 tools/trace_drops.py   path/to/Downland.a78
 python3 tools/trace_objects.py path/to/Downland.a78
 python3 tools/trace_enemies.py path/to/Downland.a78
+python3 tools/trace_rules.py   path/to/Downland.a78
 ```

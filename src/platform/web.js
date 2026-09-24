@@ -79,6 +79,12 @@ export async function createPlatform(canvas) {
       return { width, height, handle: c };
     },
 
+    // Small per-browser store (high score). Storage can be missing or blocked: never throw.
+    storage: {
+      get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+      set(key, value) { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
+    },
+
     input: {
       isDown: (name) => held.has(name),
       takePressed: () => pressed.splice(0),

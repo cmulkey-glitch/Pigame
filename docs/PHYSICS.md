@@ -146,5 +146,21 @@ Frame f = head `$E02F + 8f`, legs 4 bytes later (320C). `assets/sprites.json →
 - When the splat after a death ends the bird is removed and, if the timer had run out, it
   restarts at 2048 (4096 in chamber X). Changing chamber also removes the bird.
 
-## Not ported yet
-Chamber 9 → X rule, title screen / difficulty select.
+## Title screen (`$802A`) and game start (`$838D`)
+- Title map `$C7A6` with 8 drops that burst on the logo's circle tiles (`$C41D`); colours
+  flip every 64 frames. Shows difficulty between diamonds (EASY / NORMAL / HARD, palette
+  `$F5FD`) and mode between rings (LOOPING / ESCAPE), text at `$F5D0–$F5EA`.
+- Stick left/right: difficulty `$015F` −/+ (wraps); up/down: toggle ESCAPE (`$FA` bit 3); one
+  change per stick movement. SELECT also cycles difficulty. Fire starts after 30 frames.
+- Start: player at (`$88`, `$B7`) facing left, regenerating, fire latched; 5 lives on EASY,
+  4 otherwise; score 0, timer 4096. RESET returns to the title.
+
+## Chamber 0 / chamber X rules (`$BF44`)
+- Every entry into chamber 0 raises difficulty by one, up to HARD.
+- From chamber 9 in ESCAPE mode: go to chamber X instead (x `$0B`, facing right, timer 9999).
+- From chamber 9 in LOOPING mode: new round, all treasures, keys and doors reset (`$853C`).
+- From chamber X into chamber 0: "YOU ESCAPED" over the last frame, fire returns to the
+  title (`$C58B`).
+- Game over: "GAME OVER" for 120 frames (`$C63F`), high score kept (`$BB43`), then the title.
+
+Everything in the ROM's game loop is now ported.

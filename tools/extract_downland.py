@@ -39,6 +39,10 @@ KEY_COL, KEY_ROW, KEY_DOOR = 0xF487, 0xF4B3, 0xF4DF                 # door+1 -> 
 DOOR_INIT = 0xF50B      # initial open state per door -> $24C2
 DROP_X_LO, DROP_X_HI, DROP_Y_LO, DROP_Y_HI = 0xF3D3, 0xF3DF, 0xF3EB, 0xF3F7  # index = chamber+1
 DROP_TWEAK = 0xF088     # difficulty 2 nudges this spawn point ($B087)
+TITLE_MAP = 0xC7A6      # 20x20 title screen map ($8974 copies it to $2200)
+TITLE_TEXT_PTR_LO, TITLE_TEXT_PTR_HI, TITLE_TEXT_LEN = 0xF600, 0xF606, 0xF60C
+TITLE_TEXT_PAL = 0xF5FD     # palette per difficulty name
+END_TEXT = 0xF5EB           # "YOUESCAPED" then "GAMEOVER" at $F5F5
 BALL_X, BALL_Y = 0xF5B3, 0xF5BE   # ball start per chamber, x = 0 means no ball ($ACCF)
 EXTRA_SPRITES = [(0xBF, 1, 0, 3), (0xC0, 1, 0, 3),   # ball frames (320A, palette 3)
                  (0xE6, 2, 0, 1), (0xE8, 2, 0, 1)]   # bird frames (320A, palette 1)
@@ -77,6 +81,8 @@ def room_records(room):
     """Parse the loader's display-object list: (map index, palette, run length) per run."""
     idx = room + 1
     handler = ((rd(REC_HI + idx) << 8) | rd(REC_LO + idx)) + 1
+    if room == -1:
+        handler = 0x8995            # title: map copy loop first, then LDA #lo / STA $49 / ...
     code = [rd(handler + i) for i in range(8)]
     assert code[0] == 0xA9 and code[2] == 0x85 and code[4] == 0xA9, hex(handler)
     p = (code[5] << 8) | code[1]
@@ -138,9 +144,45 @@ def rooms_data(palettes):
     return rooms
 
 
-def boot(e):
+def text_at(addr, n):
+    """ROM text: 1..26 = A..Z (glyph byte $CB + n)."""
+    return ''.join(chr(64 + rd(addr + i)) if 1 <= rd(addr + i) <= 26 else ' ' for i in range(n))
+
+
+def title_data(palettes):
+    raw = [rd(TITLE_MAP + i) for i in range(MAP_W * 20)]
+    tiles = [[raw[r * MAP_W + c] // 2 for c in range(MAP_W)] for r in range(20)] + [[0] * MAP_W] * 4
+    _, runs = room_records(-1)
+    pal = [[0] * MAP_W for _ in range(MAP_H)]
+    for run in runs:
+        for i in range(run['len']):
+            cell = run['cell'] + i
+            if 0 <= cell < MAP_W * MAP_H:
+                pal[cell // MAP_W][cell % MAP_W] = run['palette']
+    xp = rd(DROP_X_LO) | rd(DROP_X_HI) << 8
+    yp = rd(DROP_Y_LO) | rd(DROP_Y_HI) << 8
+    texts = []
+    for i in range(5):
+        p = rd(TITLE_TEXT_PTR_LO + i) | rd(TITLE_TEXT_PTR_HI + i) << 8
+        texts.append(text_at(p, rd(TITLE_TEXT_LEN + i)))
+    return {'id': -1, 'name': 'DOWNLAND', 'tiles': tiles, 'tilePalette': pal,
+            'objects': [], 'doors': [], 'treasures': [], 'keys': [], 'ball': None,
+            'dropSpawns': [[rd(xp + i), rd(yp + i)] for i in range(32)], 'dropTweak': 0,
+            'difficultyNames': texts[:3], 'modeNames': texts[3:],
+            'difficultyPalettes': [rd(TITLE_TEXT_PAL + i) for i in range(3)],
+            'endText': [text_at(END_TEXT, 3), text_at(END_TEXT + 3, 7), text_at(END_TEXT + 10, 4) + ' ' + text_at(END_TEXT + 14, 4)],
+            'palettes7800': palettes,
+            'palettesRGB': [['#%02x%02x%02x' % PAL[c] for c in pl] for pl in palettes],
+            # $80F0: every 64 frames palette 0 / 7 colour 2 flip between these ($E6 bit 7 set: first)
+            'flashRGB': [['#%02x%02x%02x' % PAL[c] for c in pair] for pair in ((0x88, 0x8D), (0x38, 0x3D))]}
+
+
+def boot(e, on_title=None):
+    """Power on, sit on the title screen, press fire, and wait for chamber 0."""
     for _ in range(150):
         e.run_frame()
+    if on_title:
+        on_title(e)
     e.fire = True
     for _ in range(10):
         e.run_frame()
@@ -274,7 +316,8 @@ def main():
     tile_atlas(os.path.join(out, 'assets/tiles.png'))
 
     e = Emu()
-    boot(e)
+    title_pals = []
+    boot(e, on_title=lambda e: title_pals.append(palette_regs(e)))
     base = snapshot(e)
     seen, pals, shots = {}, {}, []
     random.seed(1)
@@ -306,6 +349,7 @@ def main():
     rooms = rooms_data(pals)
     json.dump({'tileSize': [16, 8], 'mapSize': [MAP_W, MAP_H],
                'doorOpenInitial': [rd(DOOR_INIT + d) for d in range(NUM_DOORS)],
+               'title': title_data(title_pals[0]),
                'note': 'tiles[row][col] indexes assets/tiles.png (16 per row). Tiles are 1bpp; '
                        'draw them in colorRGB. Object codes: see docs/ROM_NOTES.md.',
                'rooms': rooms}, open(os.path.join(out, 'data/rooms.json'), 'w'), indent=1)
