@@ -32,6 +32,8 @@ DOOR_DEST = 0xF58F      # destination chamber
 REC_HI, REC_LO = 0x895C, 0x8968  # per-chamber loader (RTS jump table, index = chamber + 1)
 OBJECT_CODES = {0x1A, 0x1C, 0x1E, 0x20, 0x22, 0x24}  # doors ($1A-$1E) and items; the loader blanks these cells
 NUM_ROOMS = 11          # chambers 0-9 plus the bonus chamber (shown as "X")
+PLAYER_BASE = 0x2F      # player frame f: head at $E02F + 8f, legs 4 bytes later (320C)
+PLAYER_FRAMES = 18
 
 
 def rd(a):
@@ -177,6 +179,13 @@ def collect_sprites(e, seen):
             seen.setdefault((lo, w, wm), pw >> 5)
 
 
+def add_player_frames(seen):
+    """The player is 18 head/legs pairs at $E02F + 8*frame; make sure all are in the sheet."""
+    for f in range(PLAYER_FRAMES):
+        for k in (0, 4):
+            seen.setdefault((PLAYER_BASE + 8 * f + k, 4, 1), 4 if 8 <= f <= 11 else 0)
+
+
 def sprite_sheet(seen, pals, img_path, json_path):
     items = sorted(seen.items())
     cells = []
@@ -218,8 +227,12 @@ def sprite_sheet(seen, pals, img_path, json_path):
         catalog.append({'addr': '$%04X' % (GFX + lo), 'bytes': w, 'mode': '320C' if wm else '320A',
                         'palette': palno, 'x': sx, 'y': sy, 'w': im.width, 'h': im.height})
     sheet.save(img_path)
-    json.dump({'note': 'Rows are 8 px; taller objects are stacked entries. Pixels are 320-mode (half width).',
-               'sprites': catalog}, open(json_path, 'w'), indent=1)
+    index = {(c['addr'], c['mode']): i for i, c in enumerate(catalog)}
+    frames = [[index[('$%04X' % (GFX + PLAYER_BASE + 8 * f + k), '320C')] for k in (0, 4)]
+              for f in range(PLAYER_FRAMES)]
+    json.dump({'note': 'Rows are 8 px; taller objects are stacked entries. Pixels are 320-mode (half width). '
+                       'playerFrames[f] = [head, legs] sprite indexes; frame numbers in docs/PHYSICS.md.',
+               'playerFrames': frames, 'sprites': catalog}, open(json_path, 'w'), indent=1)
     return len(catalog)
 
 
@@ -258,6 +271,7 @@ def main():
         sheet.paste(im, ((i % 4) * w, (i // 4) * h))
     sheet.save(os.path.join(out, 'docs/rooms/sheet.png'))
 
+    add_player_frames(seen)
     n = sprite_sheet(seen, pals[0], os.path.join(out, 'assets/sprites.png'),
                      os.path.join(out, 'assets/sprites.json'))
 

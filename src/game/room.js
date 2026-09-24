@@ -1,10 +1,10 @@
-// Chamber geometry: renders the tile map and builds pixel collision masks.
+// Chamber data: renders the tile map and answers tile-code queries for collision.
 
 export const TILE_W = 16, TILE_H = 8;
 export const MAP_W = 20, MAP_H = 24;
 export const ROOM_W = MAP_W * TILE_W, ROOM_H = MAP_H * TILE_H;   // 320 x 192
 
-export const TILE_ROPE = 1;
+export const FACE_LEFT = 1, FACE_RIGHT = 2;   // $F0 values
 export const OBJ = { DOOR_TOP: 0x1A, DOOR_MID: 0x1C, DOOR_BOT: 0x1E, DIAMOND: 0x20, RING: 0x22, KEY: 0x24 };
 
 // Decode the 1bpp tile atlas (16 tiles per row) into per-tile bit arrays.
@@ -39,8 +39,6 @@ function hexRGB(hex) {
 export class Room {
   constructor(def, tiles) {
     this.def = def;
-    this.solid = new Uint8Array(ROOM_W * ROOM_H);
-    this.rope = new Uint8Array(ROOM_W * ROOM_H);
     this.rgba = new Uint8ClampedArray(ROOM_W * ROOM_H * 4);
     for (let row = 0; row < MAP_H; row++) {
       for (let col = 0; col < MAP_W; col++) {
@@ -48,37 +46,47 @@ export class Room {
         if (!t) continue;
         const [r, g, b] = hexRGB(def.palettesRGB[def.tilePalette[row][col]][2]);
         const bits = tiles[t];
-        const mask = t === TILE_ROPE ? this.rope : this.solid;
         for (let y = 0; y < TILE_H; y++) {
           for (let x = 0; x < TILE_W; x++) {
             if (!bits[y * TILE_W + x]) continue;
             const i = (row * TILE_H + y) * ROOM_W + col * TILE_W + x;
-            mask[i] = 1;
             this.rgba.set([r, g, b, 255], i * 4);
           }
         }
       }
     }
-    // Items to collect; door tiles are scenery.
-    this.items = def.objects
-      .filter((o) => o.code >= OBJ.DIAMOND)
-      .map((o) => ({ ...o, x: o.col * TILE_W, y: o.row * TILE_H, taken: false }));
+    // Tile codes as the ROM's collision sees them (RAM map at $2200): terrain codes plus
+    // uncollected items and open doors. Closed doors would be wall codes $08/$0A; the viewer
+    // keeps every door open until key logic is ported.
+    this.codes = new Uint8Array(MAP_W * MAP_H);
+    for (let row = 0; row < MAP_H; row++)
+      for (let col = 0; col < MAP_W; col++) this.codes[row * MAP_W + col] = def.tiles[row][col] * 2;
+    for (const o of def.objects) this.codes[o.row * MAP_W + o.col] = o.code;
     this.doorTiles = def.objects.filter((o) => o.code < OBJ.DIAMOND);
   }
 
-  isSolid(x, y) {
-    if (x < 0 || x >= ROOM_W || y < 0) return false;
-    if (y >= ROOM_H) return true;
-    return this.solid[y * ROOM_W + x] === 1;
+  // Tile code under a point in 7800 coordinates ($C6F3): x = MARIA hpos, y = line with 0 at the
+  // top of the HUD row. Column c starts at x = 4 + 8c, row r at y = 8 + 8r.
+  tileAt(x, y) {
+    const col = ((x - 4) & 0xFF) >> 3, row = ((y - 8) & 0xFF) >> 3;
+    if (col >= MAP_W || row >= MAP_H) return 0;
+    return this.codes[row * MAP_W + col];
   }
 
-  isRope(x, y) {
-    if (x < 0 || x >= ROOM_W || y < 0 || y >= ROOM_H) return false;
-    return this.rope[y * ROOM_W + x] === 1;
+  clearTileAt(x, y) {
+    const col = ((x - 4) & 0xFF) >> 3, row = ((y - 8) & 0xFF) >> 3;
+    if (col < MAP_W && row < MAP_H) this.codes[row * MAP_W + col] = 0;
   }
 
-  // Top-left player position for a door record from rooms.json (game y is relative to the HUD row).
+  // Uncollected items still in the map, for drawing.
+  *items() {
+    for (let i = 0; i < this.codes.length; i++)
+      if (this.codes[i] >= OBJ.DIAMOND && this.codes[i] <= OBJ.KEY)
+        yield { code: this.codes[i], col: i % MAP_W, row: Math.floor(i / MAP_W) };
+  }
+
+  // Player position for a door record from rooms.json (already in 7800 coordinates).
   static doorSpawn(pos) {
-    return { x: pos.x * 2 - 8, y: pos.y - 8, facing: pos.side === 'right' ? -1 : 1 };
+    return { x: pos.x, y: pos.y, facing: pos.side === 'right' ? FACE_LEFT : FACE_RIGHT };
   }
 }

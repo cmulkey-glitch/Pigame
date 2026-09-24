@@ -96,7 +96,8 @@ class Emu:
         if a == 0x24:  # WSYNC
             s.pending_wsync = True
         s.regs[a] = v
-    def run_frame(s):
+    def run_frame(s, on_line=None):
+        """Run one 263-line frame. on_line = (line, fn) calls fn() when that line starts."""
         target = (s.frame+1)*LINES*CPL
         cpu = s.cpu
         while s.cyc < target:
@@ -109,6 +110,8 @@ class Emu:
             l = s.line()
             if l != getattr(s,'_last_line',-1):
                 s._last_line = l
+                if on_line and l == on_line[0]:
+                    on_line[1]()
                 if l == VIS0:
                     s.compute_dll()
                 if l in s.dli_lines:

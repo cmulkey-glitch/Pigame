@@ -24,4 +24,12 @@ collision mask. Walk into a door opening to follow the ROM's door graph.
 
 Layout: `src/platform/web.js` is the only browser-specific file (canvas, input, loading,
 frame loop). `src/game/` is plain JS game logic — a port to another system replaces the
-platform file. Movement tuning in `src/game/player.js` is guessed, not yet from the ROM.
+platform file.
+
+## Physics
+`src/game/player.js` is a port of the ROM's player code (walk, jump, fall, ropes, hanging,
+death, animation), documented in `docs/PHYSICS.md`. Check it against the ROM with:
+```
+node tests/physics.test.mjs                 # replays tests/traces/*.json, must all pass
+python3 tools/trace_player.py path/to/Downland.a78   # re-record the traces from the ROM
+```

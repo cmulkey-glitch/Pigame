@@ -41,6 +41,10 @@ game draws the object instead: `$1A–$1E` door graphics, `$20` diamond, `$22` g
 Position byte: bit 7 = right wall (x = `$8D`, else x = `$0B`), y = `(v & $7F) × 8 − 1`
 (decoded at `$BF5C`). Chamber 9 → X happens at `$BFB3` when bit 3 of `$FA` is set.
 
+## Player
+Movement, physics, death and animation are traced in `docs/PHYSICS.md`.
+
 ## Not yet traced
-- Rope/drop/spider behaviour and timings, per-chamber tables `$F5B3` / `$F5BE`.
+- Drops, ball and bird behaviour and timings, per-chamber tables `$F5B3` / `$F5BE`.
+- Key → door unlocking (`$AExx`), room timer (`$01AA/$01AB`).
 - The emulator shows garbage in the score digits; the HUD path isn't traced yet.
