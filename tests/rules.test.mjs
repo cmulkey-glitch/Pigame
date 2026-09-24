@@ -54,4 +54,27 @@ for (const c of cases) {
     console.log(`ok   ${c.name}` + (c.ending ? ' (escape ending)' : ` (chamber ${c.room}, timer ${c.timer})`));
   }
 }
+// BEGINNER (a port addition, so no ROM trace): EASY rules, no drops, never steps up.
+{
+  const check = (name, ok) => { if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); };
+  game.toTitle();
+  game.beginner = false; game.difficulty = 1;
+  game.cycleLevel(-1); game.cycleLevel(-1);
+  check('title: two steps left of NORMAL is BEGINNER', game.beginner && game.difficulty === 0);
+  game.cycleLevel(-1);
+  check('title: one more wraps to HARD', !game.beginner && game.difficulty === 2);
+  game.cycleLevel(1);
+  game.startGame();
+  check('beginner: 5 lives like EASY', game.player.lives === 5);
+  check('beginner: no drops', [...game.drops.visible()].length === 0 && !game.drops.hits(game.player.x, game.player.y));
+  game.escapeMode = false;
+  game.enterRoom(9);
+  game.prevRoom = 8;
+  const door = game.room.def.doors.find((d) => d.to === 0);
+  game.state.doorOpen.fill(1);
+  game.player.reset({ x: 0x8D, y: door.at.y, facing: 2 });
+  game.goThroughDoor('right');
+  check('beginner: entering chamber 0 keeps BEGINNER', game.roomIndex === 0 && game.beginner && game.difficulty === 0);
+  check('beginner: still no drops after a new round', [...game.drops.visible()].length === 0);
+}
 process.exit(failed ? 1 : 0);

@@ -80,3 +80,6 @@ export class Drops {
     }
   }
 }
+
+// BEGINNER mode (not in the ROM): no drops at all.
+export const NO_DROPS = { update() {}, hits: () => false, *visible() {} };

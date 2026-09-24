@@ -164,3 +164,8 @@ Frame f = head `$E02F + 8f`, legs 4 bytes later (320C). `assets/sprites.json →
 - Game over: "GAME OVER" for 120 frames (`$C63F`), high score kept (`$BB43`), then the title.
 
 Everything in the ROM's game loop is now ported.
+
+## Port additions (not in the ROM)
+- **BEGINNER** difficulty, one step left of EASY on the title screen: EASY's rules (5 lives,
+  half-speed timer) with no acid drops, and entering chamber 0 doesn't step the difficulty up.
+  The ball, the bird and falls work as usual.

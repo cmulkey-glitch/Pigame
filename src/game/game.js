@@ -6,7 +6,7 @@
 
 import { Room, decodeTiles, glyphBits, ROOM_W, ROOM_H, TILE_W, TILE_H, OBJ, FACE_LEFT, FACE_RIGHT } from './room.js';
 import { Player } from './player.js';
-import { Drops } from './drops.js';
+import { Drops, NO_DROPS } from './drops.js';
 import { Rng } from './rng.js';
 import { newGameState, collect } from './state.js';
 import { Ball, Bird, TIMER_FULL, TIMER_AFTER_BIRD_DEATH, TIMER_CHAMBER_X, returnTimer } from './enemies.js';
@@ -23,6 +23,7 @@ export class Game {
     this.rng = new Rng();
     this.frame = 0;
     this.difficulty = 1;        // $015F: 0 easy, 1 normal (power-on default), 2 hard
+    this.beginner = false;      // BEGINNER (added, not in the ROM): EASY rules without drops
     this.escapeMode = false;    // $FA bit 3: chamber 9's exit leads to chamber X
     this.hiScore = Number(platform.storage?.get('downland.hi')) || 0;
     this.mode = 'title';
@@ -76,15 +77,17 @@ export class Game {
     const moved = l || r || input.isDown('up') || input.isDown('down');
     if (moved && !this.stickWasMoved) {
       if (!l && !r) this.escapeMode = !this.escapeMode;
-      else {
-        if (r) this.difficulty++;
-        if (l) this.difficulty--;
-        if (this.difficulty < 0) this.difficulty = 2;
-        if (this.difficulty > 2) this.difficulty = 0;
-      }
+      else this.cycleLevel(r ? 1 : -1);
     }
     this.stickWasMoved = moved;
     this.drops.update(this.titleRoom);
+  }
+
+  // BEGINNER, EASY, NORMAL, HARD (wraps). BEGINNER plays by EASY's rules without drops.
+  cycleLevel(step) {
+    const level = ((this.beginner ? -1 : this.difficulty) + step + 5) % 4 - 1;
+    this.beginner = level === -1;
+    this.difficulty = Math.max(level, 0);
   }
 
   renderTitle() {
@@ -96,7 +99,9 @@ export class Game {
     for (const d of this.drops.visible()) this.sprite(this.dropSprite, toPx(d.x), d.y);
     const t = this.titleDef;
     // [$8181] difficulty between diamonds, mode between rings, centred on hpos $48
-    this.flanked(t.difficultyNames[this.difficulty], OBJ.DIAMOND, 0x82, pal[t.difficultyPalettes[this.difficulty]][2]);
+    const name = this.beginner ? 'BEGINNER' : t.difficultyNames[this.difficulty];
+    const ink = pal[this.beginner ? 5 : t.difficultyPalettes[this.difficulty]][2];
+    this.flanked(name, OBJ.DIAMOND, 0x82, ink);
     this.flanked(t.modeNames[this.escapeMode ? 1 : 0], OBJ.RING, 0x8C, pal[2][2]);
     const hi = 'HI ' + String(this.hiScore).padStart(6, '0');
     this.text(hi, 320 - 8 * hi.length, 0, pal[7][2]);
@@ -128,7 +133,7 @@ export class Game {
     this.roomIndex = index;
     this.room = new Room(this.defs[index], this.tiles);
     this.room.placeObjects(this.state);
-    this.drops = new Drops(this.defs[index], index, this.difficulty, this.rng);
+    this.drops = this.beginner ? NO_DROPS : new Drops(this.defs[index], index, this.difficulty, this.rng);
     const ball = this.defs[index].ball;
     this.ball = ball ? new Ball(ball, index) : null;
     this.bird = null;      // [$8932] leaving a chamber clears the bird
@@ -171,7 +176,7 @@ export class Game {
       else if (k === '[') this.jumpToRoom((this.roomIndex + n - 1) % n);
       else if (k >= '0' && k <= '9') this.jumpToRoom(+k);
       else if (k === 'x' || k === 'X') this.jumpToRoom(10);
-      else if (k === 'd' || k === 'D') { this.difficulty = (this.difficulty + 1) % 3; this.enterRoom(this.roomIndex); }
+      else if (k === 'd' || k === 'D') { this.cycleLevel(1); this.enterRoom(this.roomIndex); }
     }
     this.updatePlay();
   }
@@ -241,7 +246,8 @@ export class Game {
     this.prevTimer = leaving;
 
     if (to === 0) {
-      if (this.difficulty < 2) this.difficulty++;            // [$BF47] every entry into chamber 0
+      // [$BF47] every entry into chamber 0 steps difficulty up (BEGINNER stays BEGINNER)
+      if (this.difficulty < 2 && !this.beginner) this.difficulty++;
       if (from === 10) { this.endGame('escaped'); return; }   // [$BF8B] out of chamber X: you escaped
       if (from === 9 && this.escapeMode) {                    // [$BF9F] ESCAPE mode: on to chamber X
         to = 10;
@@ -313,7 +319,7 @@ export class Game {
 
     g.rect(0, 0, 320, HUD_H, '#000');
     this.text(String(this.score).padStart(6, '0'), 0, 0, pal[7][2]);
-    this.text('L' + pl.lives + ' K' + this.keys + ' D' + this.difficulty, 56, 0, pal[4][2]);
+    this.text('L' + pl.lives + ' K' + this.keys + ' D' + (this.beginner ? 'B' : this.difficulty), 56, 0, pal[4][2]);
     this.text(String(this.timer).padStart(4, '0'), 144, 0, this.timer < 500 ? pal[4][2] : pal[7][2]);
     this.text(def.name, 320 - 8 * def.name.length, 0, pal[7][2]);
 
