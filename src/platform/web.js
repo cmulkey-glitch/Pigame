@@ -19,6 +19,28 @@ export async function createPlatform(canvas) {
   addEventListener('keyup', (e) => { if (KEYMAP[e.code]) held.delete(KEYMAP[e.code]); });
   addEventListener('blur', () => held.clear());
 
+  // On-screen controls: [data-hold] buttons act like held keys (multi-touch, so you can run
+  // and jump at once); [data-press] buttons send one key press.
+  for (const el of document.querySelectorAll('[data-hold]')) {
+    const name = el.dataset.hold, pointers = new Set();
+    const release = (e) => {
+      pointers.delete(e.pointerId);
+      if (!pointers.size) { held.delete(name); el.classList.remove('down'); }
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      pointers.add(e.pointerId);
+      held.add(name);
+      el.classList.add('down');
+      try { el.setPointerCapture(e.pointerId); } catch { /* no live pointer (synthetic event) */ }
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(type, release);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  for (const el of document.querySelectorAll('[data-press]')) {
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressed.push(el.dataset.press); });
+  }
+
   function loadImage(url) {
     return new Promise((resolve, reject) => {
       const img = new Image();

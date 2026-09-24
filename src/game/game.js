@@ -80,7 +80,7 @@ export class Game {
       else if (k === '[') this.enterRoom((this.roomIndex + n - 1) % n);
       else if (k >= '0' && k <= '9') this.enterRoom(+k);
       else if (k === 'x' || k === 'X') this.enterRoom(10);
-      else if ((k === 'r' || k === 'R') && this.gameOver) this.restart();
+      else if (k === 'r' || k === 'R') this.restart();
       else if (k === 'd' || k === 'D') { this.difficulty = (this.difficulty + 1) % 3; this.enterRoom(this.roomIndex); }
     }
     if (this.gameOver) return;
