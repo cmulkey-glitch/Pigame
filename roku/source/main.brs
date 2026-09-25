@@ -194,6 +194,7 @@ function View_new(data as object) as object
         bmp: CreateObject("roBitmap", { width: 320, height: 200, AlphaEnable: true })
         backgrounds: {}, inks: {}, sprites: []
         rooms: data.rooms.rooms, title: data.rooms.title
+        version: "V" + CreateObject("roAppInfo").GetVersion()     ' shown on the title screen
         playerFrames: data.sprites.playerFrames, ballFrames: data.sprites.ballFrames
         birdFrames: data.sprites.birdFrames, dropSprite: 0
         render: View_render, renderTitle: View_renderTitle, renderPlay: View_renderPlay, background: View_background
@@ -300,6 +301,7 @@ sub View_renderTitle(g as object)
     m.flanked(modeName, &h22, &h8C, pal[2])
     hi = "HI " + Pad6(g.hiScore, 6)
     m.text(hi, 320 - 8 * Len(hi), 0, pal[7])
+    m.text(m.version, 0, 192, pal[7])     ' font has no '.', so 0.1.4 reads "V0 1 4"
 end sub
 
 sub View_render(g as object)
