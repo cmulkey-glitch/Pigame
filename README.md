@@ -60,5 +60,7 @@ open `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press
 
 Remote, held sideways (top to the left): Up moves left, Down moves right, Right climbs up,
 Left climbs down. Play or OK jumps, in the direction held or released in the last ~12 frames,
-since a Roku remote can't send two buttons together. Back returns to the title (exits from
-the title), Rew / Fwd step through chambers (playtest).
+since a Roku remote can't send two buttons together. After a jump in a direction that direction
+stays held (keep running on landing, chain jumps with Play alone) until you press any arrow,
+catch a rope or die. Back returns to the title (exits from the title), Rew / Fwd step through
+chambers (playtest).

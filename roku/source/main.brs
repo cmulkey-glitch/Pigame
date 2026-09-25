@@ -49,6 +49,11 @@ sub Main()
         if acc > stepMs * 4 then acc = stepMs * 4
         while acc >= stepMs
             acc = acc - stepMs
+            if game.mode <> "play" then
+                pad.endLatch()
+            else if game.player.climbing or game.player.dead then
+                pad.endLatch()
+            end if
             game.update(pad.sample(), pad.takeActions())
             for each s in game.sfx
                 audio.handle(s)
@@ -87,9 +92,13 @@ end function
 ' A Roku remote sends one key at a time, so direction + jump can't be held together. Jump goes
 ' in the direction held, or released, within the last 12 frames; the jump keeps that
 ' direction for its first frames so the ROM's take-off check sees it.
+' Momentum: after a jump in a direction that direction stays held (the latch), as a joystick
+' would be, so the player keeps running on landing and the next jump goes the same way. It
+' ends on any arrow press, on releasing that arrow later, or (endLatch) on a rope or death.
 function Pad_new() as object
     return {
         held: {}, frame: 0, lastLeft: -99, lastRight: -99, jumpFrames: 0, jumpDir: ""
+        latchDir: "", latchFrame: 0, endLatch: Pad_endLatch
         actions: [], key: Pad_key, sample: Pad_sample, takeActions: Pad_takeActions
     }
 end function
@@ -106,6 +115,8 @@ sub Pad_key(code as integer)
         n = Pad_button(code - 100)
         if n <> "" then
             m.held.Delete(n)
+            ' the remote's own release as Play goes down arrives right after the jump: ignore it
+            if n = m.latchDir and m.frame - m.latchFrame > 12 then m.latchDir = ""
             if n = "left" then m.lastLeft = m.frame
             if n = "right" then m.lastRight = m.frame
         end if
@@ -117,11 +128,17 @@ sub Pad_key(code as integer)
     n = Pad_button(code)
     if n = "" then return
     m.held[n] = true
+    if n <> "jump" then m.latchDir = ""
     if n = "jump" then
         m.jumpFrames = 6
         m.jumpDir = ""
         if m.held.DoesExist("left") or m.frame - m.lastLeft <= 12 then m.jumpDir = "left"
         if m.held.DoesExist("right") or m.frame - m.lastRight <= 12 then m.jumpDir = "right"
+        if m.latchDir <> "" then m.jumpDir = m.latchDir
+        if m.jumpDir <> "" then
+            m.latchDir = m.jumpDir
+            m.latchFrame = m.frame
+        end if
     end if
 end sub
 
@@ -132,6 +149,13 @@ function Pad_sample() as object
             down: h.DoesExist("down"), jump: h.DoesExist("jump") }
     if inp.left then m.lastLeft = m.frame
     if inp.right then m.lastRight = m.frame
+    if m.latchDir = "left" then
+        inp.left = true
+        inp.right = false
+    else if m.latchDir = "right" then
+        inp.right = true
+        inp.left = false
+    end if
     if m.jumpFrames > 0 then
         m.jumpFrames = m.jumpFrames - 1
         inp.jump = true
@@ -145,6 +169,10 @@ function Pad_sample() as object
     end if
     return inp
 end function
+
+sub Pad_endLatch()
+    m.latchDir = ""
+end sub
 
 function Pad_takeActions() as object
     a = m.actions
