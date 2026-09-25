@@ -342,7 +342,7 @@ export class Game {
     for (const o of this.room.objects()) {
       if (!o.code) continue;
       const color = o.code === OBJ.KEY ? pal[4][2] : o.code === OBJ.DIAMOND ? pal[5][2]
-        : o.code >= OBJ.DOOR_TOP ? pal[2][2] : pal[0][2];   // door / ring / closed-door wall
+        : pal[2][2];   // ring, and door cells open or locked (the ROM draws a locked door's wall in the door colour)
       this.drawBits(this.tiles[o.code >> 1], TILE_W, TILE_H, o.col * TILE_W, HUD_H + o.row * TILE_H, color);
     }
     for (const d of this.drops.visible()) this.sprite(this.dropSprite, toPx(d.x), d.y);

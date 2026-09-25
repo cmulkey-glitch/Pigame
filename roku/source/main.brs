@@ -5,8 +5,8 @@
 ' scaled 3x with nearest-neighbour onto the 1280 x 720 screen. Game coordinates convert as on
 ' the web: px = x * 2 - 8, py = y.
 '
-' Remote: arrows move / climb, OK or Play jumps, Back returns to the title (exits from the
-' title), Rew / Fwd step through chambers while playing (playtest chamber select).
+' Remote (held sideways, see Pad_new): arrows move / climb, any other button jumps, Back
+' returns to the title (exits from the title), Rew / Fwd step through chambers (playtest).
 
 sub Main()
     port = CreateObject("roMessagePort")
@@ -62,7 +62,7 @@ sub Main()
             reg.Flush()
         end if
 
-        v.render(game)
+        v.render(game, pad)
         screen.Clear(&h000000FF)
         screen.DrawScaledObject(160, 60, 3, 3, v.region)
         screen.SwapBuffers()
@@ -82,21 +82,33 @@ function Pad6(n as integer, width as integer) as string
 end function
 
 ' ---- remote ----
-' A Roku remote sends one key at a time, so direction + OK can't be held together. OK jumps
+' The remote is held sideways (top to the left): Up moves left, Right climbs up, Down moves
+' right, Left climbs down. Every button that isn't an arrow, Back, Rew or Fwd jumps (OK, Play,
+' Replay, *, and whatever the remote's extra buttons send); an unrecognised one shows its key
+' code on screen for two seconds.
+' A Roku remote sends one key at a time, so direction + jump can't be held together. Jump goes
 ' in the direction held, or released, within the last 12 frames; the jump keeps that
 ' direction for its first frames so the ROM's take-off check sees it.
 function Pad_new() as object
     return {
         held: {}, frame: 0, lastLeft: -99, lastRight: -99, jumpFrames: 0, jumpDir: ""
+        unknownKey: -1, unknownFrames: 0
         actions: [], key: Pad_key, sample: Pad_sample, takeActions: Pad_takeActions
     }
 end function
 
+function Pad_button(code as integer) as string
+    dirs = { "2": "left", "5": "up", "3": "right", "4": "down" }
+    n = dirs[code.ToStr()]
+    if n <> invalid then return n
+    if code = 0 or code = 8 or code = 9 then return ""
+    return "jump"
+end function
+
 sub Pad_key(code as integer)
-    names = { "2": "up", "3": "down", "4": "left", "5": "right", "6": "jump", "13": "jump" }
     if code >= 100 then
-        n = names[(code - 100).ToStr()]
-        if n <> invalid then
+        n = Pad_button(code - 100)
+        if n <> "" then
             m.held.Delete(n)
             if n = "left" then m.lastLeft = m.frame
             if n = "right" then m.lastRight = m.frame
@@ -106,10 +118,15 @@ sub Pad_key(code as integer)
     if code = 0 then m.actions.Push("title")
     if code = 8 then m.actions.Push("prev")
     if code = 9 then m.actions.Push("next")
-    n = names[code.ToStr()]
-    if n = invalid then return
+    n = Pad_button(code)
+    if n = "" then return
     m.held[n] = true
     if n = "jump" then
+        known = { "6": 1, "7": 1, "10": 1, "13": 1 }
+        if not known.DoesExist(code.ToStr()) then
+            m.unknownKey = code
+            m.unknownFrames = 120
+        end if
         m.jumpFrames = 6
         m.jumpDir = ""
         if m.held.DoesExist("left") or m.frame - m.lastLeft <= 12 then m.jumpDir = "left"
@@ -119,6 +136,7 @@ end sub
 
 function Pad_sample() as object
     m.frame = m.frame + 1
+    if m.unknownFrames > 0 then m.unknownFrames = m.unknownFrames - 1
     h = m.held
     inp = { left: h.DoesExist("left"), right: h.DoesExist("right"), up: h.DoesExist("up")
             down: h.DoesExist("down"), jump: h.DoesExist("jump") }
@@ -188,7 +206,7 @@ function View_new(data as object) as object
         rooms: data.rooms.rooms, title: data.rooms.title
         playerFrames: data.sprites.playerFrames, ballFrames: data.sprites.ballFrames
         birdFrames: data.sprites.birdFrames, dropSprite: 0
-        render: View_render, renderTitle: View_renderTitle, background: View_background
+        render: View_render, renderTitle: View_renderTitle, renderPlay: View_renderPlay, background: View_background
         ink: View_ink, tile: View_tile, text: View_text, flanked: View_flanked, sprite: View_sprite
         region: invalid, regions: {}, glyph: View_glyph
     }
@@ -294,11 +312,16 @@ sub View_renderTitle(g as object)
     m.text(hi, 320 - 8 * Len(hi), 0, pal[7])
 end sub
 
-sub View_render(g as object)
+sub View_render(g as object, pad as object)
     if g.mode = "title" then
         m.renderTitle(g)
-        return
+    else
+        m.renderPlay(g)
     end if
+    if pad.unknownFrames > 0 then m.text("KEY " + pad.unknownKey.ToStr(), 0, 192, "#FFFFFF")
+end sub
+
+sub View_renderPlay(g as object)
     def = g.room.def
     pal = def.palettesRGB
     m.bmp.Clear(&h000000FF)
@@ -310,10 +333,8 @@ sub View_render(g as object)
                 ink = pal[4][2]
             else if c = &h20 then
                 ink = pal[5][2]
-            else if c >= &h1A then
-                ink = pal[2][2]
             else
-                ink = pal[0][2]
+                ink = pal[2][2]     ' ring, and door cells open or locked (locked = wall in door colour)
             end if
             m.tile(c, o.col * 16, 8 + o.row * 8, ink)
         end if

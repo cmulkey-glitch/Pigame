@@ -97,6 +97,7 @@ def main():
         background(title, pal, masks).save(os.path.join(img, f'title_{i}.png'))
         colours.update(p[2] for p in pal)
     colours.discard('#000000')
+    colours.add('#FFFFFF')      # main.brs key-code overlay
 
     alpha = atlas.getchannel('A')
     for c in sorted(colours):

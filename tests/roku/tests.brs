@@ -60,7 +60,7 @@ end function
 ' ---- player physics: tests/traces/*.json with a player start ----
 function TestPhysics() as integer
     fails = 0
-    names = ["jump_running", "jump_spam", "jump_standing", "ledge_death", "rope", "rope_drop", "walk", "wall_bounce"]
+    names = ["jump_running", "jump_spam", "jump_standing", "ledge_death", "rope", "rope_drop", "walk", "wall_bounce", "locked_door", "locked_door_jump", "locked_door_left", "locked_door_left_jump"]
     for each name in names
         t = LoadJson("tests/traces/" + name + ".json")
         s = t.start

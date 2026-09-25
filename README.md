@@ -58,6 +58,8 @@ python3 tools/build_roku.py       # -> dist/downland-roku.zip
 Sideload: enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, Right),
 open `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press Install.
 
-Remote: arrows move / climb, OK or Play jumps (in the direction held or released in the last
-~12 frames — a Roku remote can't send direction + OK together), Back returns to the title
-(exits from the title), Rew / Fwd step through chambers (playtest).
+Remote, held sideways (top to the left): Up moves left, Down moves right, Right climbs up,
+Left climbs down. Any other button jumps (OK, Play, Replay, *, extra buttons), in the direction
+held or released in the last ~12 frames, since a Roku remote can't send two buttons together.
+An unrecognised button shows its key code bottom-left. Back returns to the title (exits from
+the title), Rew / Fwd step through chambers (playtest).
