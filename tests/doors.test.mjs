@@ -45,4 +45,25 @@ else collect(s, room, ev, new Rng());
 check('chamber 0 after key (door 0 opens)', room.codes, trace.keyPickup.after);
 check('key slots after pickup', s.keyDoor, trace.keyPickup.keysLeft);
 check('door states after pickup', s.doorOpen, trace.keyPickup.doorOpen);
+// Every key in the game, dropped through as in the ROM trace: the same door must open.
+const keyBad = [];
+for (const k of trace.allKeys) {
+  const st = newGameState(data.rooms, data.doorOpenInitial);
+  const rm = new Room(data.rooms[k.chamber], noTiles);
+  rm.placeObjects(st);
+  const doors = st.doorOpen.slice();
+  const pl = new Player();
+  pl.reset({ x: 4 + 8 * k.col - 2, y: 8 + 8 * k.row - 11, facing: 2 });
+  pl.air = true; pl.vertical = true; pl.vyHi = 0xFF;
+  for (let f = 1; f <= 12; f++) {
+    pl.update(rm, idle, f);
+    for (const e of pl.events) if (e.type === 'pickup') collect(st, rm, e, new Rng());
+    pl.events.length = 0;
+  }
+  const opened = st.doorOpen.flatMap((v, i) => (v !== doors[i] ? [i] : []));
+  if (!k.taken || JSON.stringify(opened) !== JSON.stringify(k.opened))
+    keyBad.push(`chamber ${k.chamber} slot ${k.slot}: js ${JSON.stringify(opened)} rom ${JSON.stringify(k.opened)}`);
+}
+if (keyBad.length) { failed++; console.log('FAIL keys: ' + keyBad.join('; ')); }
+else console.log(`ok   all ${trace.allKeys.length} keys open the ROM's door`);
 process.exit(failed ? 1 : 0);

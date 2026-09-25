@@ -247,7 +247,41 @@ function TestDoors() as integer
             if s.doorOpen[i] <> tr.keyPickup.doorOpen[i] then err = "door " + Num(i)
         end for
     end if
-    return fails + Report("doors: key opens its door", err)
+    fails = fails + Report("doors: key opens its door", err)
+
+    ' every key in the game, dropped through as in the ROM trace: the same door must open
+    err = ""
+    for each k in tr.allKeys
+        st = NewGameState(data.rooms, data.doorOpenInitial)
+        rm = Room_new(data.rooms[k.chamber])
+        rm.placeObjects(st)
+        doors = []
+        for each v in st.doorOpen
+            doors.Push(v)
+        end for
+        pl = Player_new()
+        pl.reset({ x: 4 + 8 * k.col - 2, y: 8 + 8 * k.row - 11, facing: 2 }, false)
+        pl.air = true : pl.vertical = true : pl.vyHi = &hFF
+        for f = 1 to 12
+            pl.update(rm, idle, f)
+            for each e in pl.events
+                if e.kind = "pickup" then Collect(st, rm, e, Rng_new())
+            end for
+            pl.events = []
+        end for
+        opened = []
+        for i = 0 to 35
+            if st.doorOpen[i] <> doors[i] then opened.Push(i)
+        end for
+        same = k.taken and opened.Count() = k.opened.Count()
+        if same then
+            for i = 0 to opened.Count() - 1
+                if opened[i] <> k.opened[i] then same = false
+            end for
+        end if
+        if not same then err = "chamber " + Num(k.chamber) + " slot " + Num(k.slot)
+    end for
+    return fails + Report("doors: all " + Num(tr.allKeys.Count()) + " keys open the ROM's door", err)
 end function
 
 ' ---- sound driver vs TIA registers ----

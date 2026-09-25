@@ -71,3 +71,36 @@ Movement, physics, death and animation are traced in `docs/PHYSICS.md`.
 (Ball, bird, timer, title screen and chamber X rules: `docs/PHYSICS.md`. `$F5B3`/`$F5BE`
 are the ball's start x/y.)
 - The emulator shows garbage in the score digits; the HUD path isn't traced yet.
+
+## Keys and doors
+
+Each key opens one door, usually not in its own chamber. The key tables are `$F487` (column),
+`$F4B3` (row) and `$F4DF` (door + 1, copied to `$2496` at `$853C`); door open flags start from
+`$F50B` (copied to `$24C2`). Pickup (`$B41B`) finds the key by cell, opens `$24C2[door]` and
+redraws the door if it's in the current chamber. Verified by dropping through every key in
+the ROM (`tools/trace_objects.py`, `allKeys`). Rows count tile rows from the top (0-23).
+
+| Key in | Key cell (col, row) | Opens door | Door is in | Wall, row | Leads to |
+|---|---|---|---|---|---|
+| 0 | 5, 6 | 0 | 0 | right, 4 | 1 |
+| 0 | 13, 14 | 4 | 1 | right, 11 | 2 |
+| 1 | 9, 3 | 23 | 5 | right, 10 | 7 |
+| 1 | 12, 3 | 28 | 7 | right, 9 | 8 |
+| 2 | 5, 7 | 6 | 2 | left, 17 | 1 |
+| 2 | 14, 6 | 9 | 2 | right, 10 | 3 |
+| 3 | 6, 9 | 16 | 3 | right, 17 | 4 |
+| 3 | 17, 7 | 15 | 3 | right, 10 | 4 |
+| 4 | 2, 7 | 5 | 2 | left, 4 | 5 |
+| 4 | 2, 14 | 1 | 1 | left, 4 | 6 |
+| 5 | 1, 4 | 22 | 5 | left, 23 | 6 |
+| 5 | 17, 1 | 24 | 5 | right, 19 | 2 |
+| 6 | 3, 1 | 25 | 6 | right, 8 | 5 |
+| 6 | 16, 13 | 26 | 6 | right, 16 | 1 |
+| 7 | 1, 4 | 27 | 7 | left, 23 | 5 |
+| 7 | 11, 20 | 30 | 8 | right, 7 | 9 |
+| 8 | 5, 7 | 29 | 8 | left, 23 | 7 |
+| 8 | 9, 3 | 33 | 9 | right, 23 | 0 |
+| 9 | 8, 1 | 31 | 9 | left, 4 | 8 |
+| 9 | 9, 7 | 32 | 9 | left, 21 | 8 |
+| X | 1, 1 | 34 | X | left, 23 | 9 |
+| X | 5, 20 | 35 | X | right, 4 | 0 |

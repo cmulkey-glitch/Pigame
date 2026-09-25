@@ -5,7 +5,7 @@
 ' scaled 3x with nearest-neighbour onto the 1280 x 720 screen. Game coordinates convert as on
 ' the web: px = x * 2 - 8, py = y.
 '
-' Remote (held sideways, see Pad_new): arrows move / climb, any other button jumps, Back
+' Remote (held sideways, see Pad_new): arrows move / climb, Play or OK jumps, Back
 ' returns to the title (exits from the title), Rew / Fwd step through chambers (playtest).
 
 sub Main()
@@ -62,7 +62,7 @@ sub Main()
             reg.Flush()
         end if
 
-        v.render(game, pad)
+        v.render(game)
         screen.Clear(&h000000FF)
         screen.DrawScaledObject(160, 60, 3, 3, v.region)
         screen.SwapBuffers()
@@ -83,26 +83,22 @@ end function
 
 ' ---- remote ----
 ' The remote is held sideways (top to the left): Up moves left, Right climbs up, Down moves
-' right, Left climbs down. Every button that isn't an arrow, Back, Rew or Fwd jumps (OK, Play,
-' Replay, *, and whatever the remote's extra buttons send); an unrecognised one shows its key
-' code on screen for two seconds.
+' right, Left climbs down. Play and OK jump.
 ' A Roku remote sends one key at a time, so direction + jump can't be held together. Jump goes
 ' in the direction held, or released, within the last 12 frames; the jump keeps that
 ' direction for its first frames so the ROM's take-off check sees it.
 function Pad_new() as object
     return {
         held: {}, frame: 0, lastLeft: -99, lastRight: -99, jumpFrames: 0, jumpDir: ""
-        unknownKey: -1, unknownFrames: 0
         actions: [], key: Pad_key, sample: Pad_sample, takeActions: Pad_takeActions
     }
 end function
 
 function Pad_button(code as integer) as string
-    dirs = { "2": "left", "5": "up", "3": "right", "4": "down" }
-    n = dirs[code.ToStr()]
-    if n <> invalid then return n
-    if code = 0 or code = 8 or code = 9 then return ""
-    return "jump"
+    buttons = { "2": "left", "5": "up", "3": "right", "4": "down", "6": "jump", "13": "jump" }
+    n = buttons[code.ToStr()]
+    if n = invalid then return ""
+    return n
 end function
 
 sub Pad_key(code as integer)
@@ -122,11 +118,6 @@ sub Pad_key(code as integer)
     if n = "" then return
     m.held[n] = true
     if n = "jump" then
-        known = { "6": 1, "7": 1, "10": 1, "13": 1 }
-        if not known.DoesExist(code.ToStr()) then
-            m.unknownKey = code
-            m.unknownFrames = 120
-        end if
         m.jumpFrames = 6
         m.jumpDir = ""
         if m.held.DoesExist("left") or m.frame - m.lastLeft <= 12 then m.jumpDir = "left"
@@ -136,7 +127,6 @@ end sub
 
 function Pad_sample() as object
     m.frame = m.frame + 1
-    if m.unknownFrames > 0 then m.unknownFrames = m.unknownFrames - 1
     h = m.held
     inp = { left: h.DoesExist("left"), right: h.DoesExist("right"), up: h.DoesExist("up")
             down: h.DoesExist("down"), jump: h.DoesExist("jump") }
@@ -312,13 +302,12 @@ sub View_renderTitle(g as object)
     m.text(hi, 320 - 8 * Len(hi), 0, pal[7])
 end sub
 
-sub View_render(g as object, pad as object)
+sub View_render(g as object)
     if g.mode = "title" then
         m.renderTitle(g)
     else
         m.renderPlay(g)
     end if
-    if pad.unknownFrames > 0 then m.text("KEY " + pad.unknownKey.ToStr(), 0, 192, "#FFFFFF")
 end sub
 
 sub View_renderPlay(g as object)
