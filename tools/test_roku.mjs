@@ -11,8 +11,10 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const game = readdirSync(join(root, 'roku', 'source')).filter((f) => f.endsWith('.brs') && f !== 'main.brs')
   .map((f) => join(root, 'roku', 'source', f));
-const brs = process.env.BRS || 'brs';
-const r = spawnSync(brs, ['--root', root, ...game, join(root, 'tests', 'roku', 'tests.brs')], { encoding: 'utf8' });
+// brs-device.cjs wraps brs with the Roku's shared for-each iterator (see that file).
+const brs = process.env.BRS || spawnSync('which', ['brs'], { encoding: 'utf8' }).stdout.trim();
+const r = spawnSync(process.execPath, [join(root, 'tools', 'brs-device.cjs'), brs, '--root', root, ...game,
+  join(root, 'tests', 'roku', 'tests.brs')], { encoding: 'utf8' });
 process.stdout.write(r.stdout || '');
 process.stderr.write(r.stderr || '');
 const bsc = spawnSync(process.env.BSC || 'bsc', ['--root-dir', join(root, 'roku'), '--create-package', 'false',
@@ -20,4 +22,5 @@ const bsc = spawnSync(process.env.BSC || 'bsc', ['--root-dir', join(root, 'roku'
 const errors = (bsc.stdout || '') + (bsc.stderr || '');
 const compiled = bsc.status === 0 && !/ error /.test(errors);
 console.log(compiled ? 'ok   device compile check (bsc)' : 'FAIL device compile check (bsc)\n' + errors);
-process.exit(/ALL PASS/.test(r.stdout || '') && compiled ? 0 : 1);
+const nested = /device for-each/.test(r.stderr || '');
+process.exit(/ALL PASS/.test(r.stdout || '') && compiled && !nested ? 0 : 1);

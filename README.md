@@ -52,7 +52,7 @@ plus `main.brs` for the screen, remote and sound. Chamber art is pre-rendered, t
 are drawn from pre-tinted copies of the tile atlas, and sound effects are WAVs rendered by the
 same driver + TIA synth as the web (`tools/render_sounds.mjs`), since Roku can't synthesize.
 ```
-node tools/test_roku.mjs          # ROM trace checks + device compile check (npm i -g brs brighterscript)
+node tools/test_roku.mjs          # ROM trace checks (device for-each semantics) + compile check (npm i -g brs brighterscript)
 python3 tools/build_roku.py       # -> dist/downland-roku.zip
 ```
 Sideload: enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, Right),

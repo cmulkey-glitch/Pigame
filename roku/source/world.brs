@@ -73,8 +73,12 @@ sub Room_placeObjects(state as object)
 end sub
 
 ' [$AEFD / $B4AE] door cells: column 0 or 18, three rows ending at the door's row
+' Index loop, not for each: placeObjects calls this from inside its own for each over the same
+' array, and a Roku array has one iteration position (a nested for each ends the outer loop).
 sub Room_setDoor(id as integer, isOpen as integer)
-    for each d in m.def.doors
+    doors = m.def.doors
+    for i = 0 to doors.Count() - 1
+        d = doors[i]
         if d.id = id then
             if d.at.side = "right" then
                 col = 18 : closed = &h0A
