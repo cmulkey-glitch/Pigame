@@ -64,3 +64,10 @@ since a Roku remote can't send two buttons together. A jump keeps its direction 
 then you stop unless an arrow is held; Play within ~12 frames of landing chains another jump
 the same way. Back returns to the title (exits from the title), Rew / Fwd step through
 chambers (playtest).
+
+## Cube Dash (Roku)
+A separate, original Geometry Dash–style runner for Roku lives in `dash/`; see `dash/README.md`.
+```
+python3 dash/tools/build.py       # -> dist/cube-dash-roku.zip
+node dash/tools/test.mjs          # physics checks + every level beatable + compile check
+```
