@@ -89,6 +89,11 @@ sub Test_physics()
     Check(r.orbs.Count() = 1, "pressing inside an orb uses it")
     r = Play(orb, [40], 80)
     Check(r.orbs.Count() = 0, "an orb needs a press")
+    r = Run_new(orb)
+    for f = 0 to 79
+        Run_step(r, f >= 40)
+    end for
+    Check(r.orbs.Count() = 1, "holding through an orb uses it")
 
     ship = Mini("..........S.............................................")
     r = Run_new(ship)

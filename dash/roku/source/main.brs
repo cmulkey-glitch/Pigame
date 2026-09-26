@@ -116,7 +116,9 @@ function App_key(code as integer) as boolean
         if code = 0 then
             m.music.Stop()
             m.mode = "menu"
-        else if isJump and not m.jumpDown then
+        else if isJump then
+            ' every press counts, even if its release has not arrived yet or came in the same
+            ' frame (a quick second tap for an orb)
             m.jumpDown = true
             m.tapped = true
         end if
@@ -161,6 +163,7 @@ sub App_update()
         return
     end if
     held = m.jumpDown or m.tapped
+    if m.tapped then r.held = false     ' a fresh press: make sure Run_step sees the edge
     m.tapped = false
     Run_step(r, held)
     for each e in r.events

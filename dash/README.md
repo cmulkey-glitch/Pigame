@@ -11,6 +11,7 @@ and the attempt restarts. Three levels: First Flight (easy), Orbit Run (normal),
 
 ## Remote
 - OK, Play or Up: jump. Hold to keep jumping on landing; as a ship, hold to climb.
+- Yellow orb: press (or be holding) while touching it for a second jump in mid-air.
 - Menu: Left / Right picks a level, OK plays, Back exits.
 - In a level: Back returns to the menu.
 

@@ -8,7 +8,7 @@
 ' Level cells:
 '   #  block: land on top, crash into the sides (and the underside in cube mode)
 '   ^  spike on the floor of the cell      v  spike hanging from the top of the cell
-'   _  jump pad: launches a cube high      o  jump orb: press while touching for a mid-air jump
+'   _  jump pad: launches a cube high      o  jump orb: press (or hold) while touching: mid-air jump
 '   S  ship portal                         C  cube portal (portals act on the whole column)
 
 function Dash_phys() as object
@@ -23,7 +23,7 @@ function Dash_phys() as object
         shipAcc: 0.018      ' ship: holding accelerates up, releasing down
         shipMax: 0.2
         snap: 0.25          ' how far into a block top (or ship: underside) still counts as landing
-        buffer: 6           ' a press counts for this many frames (orbs, landing)
+        buffer: 10          ' a press counts for this many frames (orbs, landing); TVs lag
     }
 end function
 
@@ -197,7 +197,7 @@ sub Run_step(r as object, held as boolean)
                     r.events.Push("pad")
                 end if
             else if k = "o" then
-                if r.mode = "cube" and r.buffer > 0 and not r.orbs.DoesExist(o.id) and Box_hit(r.x, r.y, r.x + 1, r.y + 1, c - 0.1, o.r - 0.1, c + 1.1, o.r + 1.1) then
+                if r.mode = "cube" and (held or r.buffer > 0) and not r.orbs.DoesExist(o.id) and Box_hit(r.x, r.y, r.x + 1, r.y + 1, c - 0.1, o.r - 0.1, c + 1.1, o.r + 1.1) then
                     r.orbs[o.id] = true
                     r.vy = p.orb
                     r.grounded = false
