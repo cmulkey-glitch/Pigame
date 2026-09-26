@@ -49,11 +49,7 @@ sub Main()
         if acc > stepMs * 4 then acc = stepMs * 4
         while acc >= stepMs
             acc = acc - stepMs
-            if game.mode <> "play" then
-                pad.endLatch()
-            else if game.player.climbing or game.player.dead then
-                pad.endLatch()
-            end if
+            pad.track(game)
             game.update(pad.sample(), pad.takeActions())
             for each s in game.sfx
                 audio.handle(s)
@@ -92,13 +88,14 @@ end function
 ' A Roku remote sends one key at a time, so direction + jump can't be held together. Jump goes
 ' in the direction held, or released, within the last 12 frames; the jump keeps that
 ' direction for its first frames so the ROM's take-off check sees it.
-' Momentum: after a jump in a direction that direction stays held (the latch), as a joystick
-' would be, so the player keeps running on landing and the next jump goes the same way. It
-' ends on any arrow press, on releasing that arrow later, or (endLatch) on a rope or death.
+' Momentum: a jump in a direction keeps that direction held until the player lands (the
+' latch), then stops unless an arrow is really held. Landing counts as the direction being
+' held that frame, so Play within 12 frames of landing chains another jump the same way.
+' Any arrow press, a rope or a death also ends the latch.
 function Pad_new() as object
     return {
         held: {}, frame: 0, lastLeft: -99, lastRight: -99, jumpFrames: 0, jumpDir: ""
-        latchDir: "", latchFrame: 0, endLatch: Pad_endLatch
+        latchDir: "", latchFrame: 0, sawAir: false, endLatch: Pad_endLatch, track: Pad_track
         actions: [], key: Pad_key, sample: Pad_sample, takeActions: Pad_takeActions
     }
 end function
@@ -138,6 +135,7 @@ sub Pad_key(code as integer)
         if m.jumpDir <> "" then
             m.latchDir = m.jumpDir
             m.latchFrame = m.frame
+            m.sawAir = false
         end if
     end if
 end sub
@@ -147,8 +145,6 @@ function Pad_sample() as object
     h = m.held
     inp = { left: h.DoesExist("left"), right: h.DoesExist("right"), up: h.DoesExist("up")
             down: h.DoesExist("down"), jump: h.DoesExist("jump") }
-    if inp.left then m.lastLeft = m.frame
-    if inp.right then m.lastRight = m.frame
     if m.latchDir = "left" then
         inp.left = true
         inp.right = false
@@ -167,11 +163,32 @@ function Pad_sample() as object
             inp.left = false
         end if
     end if
+    ' after the latch and jump forcing, so a latched direction counts as recently held
+    if inp.left then m.lastLeft = m.frame
+    if inp.right then m.lastRight = m.frame
     return inp
 end function
 
 sub Pad_endLatch()
     m.latchDir = ""
+    m.sawAir = false
+end sub
+
+' called every step with the game: the latch ends on landing, on a rope, on death, off play
+sub Pad_track(game as object)
+    if m.latchDir = "" then return
+    if game.mode <> "play" then
+        m.endLatch()
+        return
+    end if
+    pl = game.player
+    if pl.climbing or pl.dead then
+        m.endLatch()
+    else if pl.air then
+        m.sawAir = true
+    else if m.sawAir then
+        m.endLatch()
+    end if
 end sub
 
 function Pad_takeActions() as object
