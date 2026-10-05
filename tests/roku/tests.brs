@@ -61,11 +61,21 @@ end function
 function TestPhysics() as integer
     fails = 0
     names = ["jump_running", "jump_spam", "jump_standing", "ledge_death", "rope", "rope_drop", "walk", "wall_bounce", "locked_door", "locked_door_jump", "locked_door_left", "locked_door_left_jump"]
+    runs = []
     for each name in names
         t = LoadJson("tests/traces/" + name + ".json")
+        t.name = name
+        runs.Push(t)
+    end for
+    ' non-ROM physics, recorded from the JS player by tools/record_custom_physics.mjs
+    for each t in LoadJson("tests/traces/physics_custom.json").cases
+        runs.Push(t)
+    end for
+    for each t in runs
+        name = t.name
         s = t.start
         room = MapRoom(s.map)
-        p = Player_new()
+        p = Player_new(Physics_from(t.physics))
         p.x = s.x : p.y = s.y : p.facing = s.facing : p.vyHi = s.vyHi : p.vyLo = s.vyLo
         p.air = (s.f1 and 1) <> 0 : p.vertical = (s.f1 and 2) <> 0 : p.regen = (s.f1 and 4) <> 0
         p.jumpLatch = (s.f1 and 8) <> 0 : p.dead = (s.f1 and &h10) <> 0 : p.running = (s.f1 and &h20) <> 0

@@ -1,10 +1,12 @@
 // Player logic ported from the Atari 7800 Downland ROM. See docs/PHYSICS.md for the trace.
 //
 // Units are the 7800's: x = MARIA hpos ($ED), y = scanline with 0 at the top of the HUD row
-// ($EE). Collision is tile based through room.tileAt(). Movement runs on a 4-frame tick
-// (tick = frame & 3); the ROM routine for each step is noted in brackets.
+// ($EE). Collision is tile based through room.tileAt(). Movement runs once per step of
+// physics.stepFrames frames (the ROM's 4-frame tick); the ROM routine for each part is noted
+// in brackets. The tunable numbers come from physics.js; with ROM_PHYSICS this is the ROM.
 
 import { FACE_LEFT, FACE_RIGHT } from './room.js';
+import { physicsFrom } from './physics.js';
 
 const T_FLOOR = 0x04;       // only this tile can be stood on
 const T_ROPE = 0x02, T_BAR = 0x2A, T_ROPE_TOP = 0x2C;
@@ -12,11 +14,6 @@ const T_DOOR_FIRST = 0x1A, T_DOOR_LAST = 0x1E;
 const T_ITEM_FIRST = 0x20, T_ITEM_LAST = 0x24;
 const DOOR_RIGHT_X = 0x8D, DOOR_LEFT_X = 0x0B;
 
-const JUMP_VY = 0x0580;     // 8.8, positive = up
-const GRAVITY = 0x00C0;     // subtracted every tick
-const TERMINAL_HI = 0xF9;   // high byte clamp while falling; landing at it kills
-const SAFE_LANDING_HI = 0xFA;
-const HOLD_TICKS = 6;       // left/right held on a rope before hanging / letting go
 const SPLAT_FRAMES = 0x4B;
 const SPLAT_SECOND_FRAME = 0x43;
 const MIDAIR_DEATH_FRAMES = 0x2C;
@@ -25,8 +22,18 @@ const isWall = (t) => t > 6 && t < T_ITEM_FIRST;           // air: 7..$1F
 const isItem = (t) => t >= T_ITEM_FIRST && t <= T_ITEM_LAST;
 const isDoor = (t) => t >= T_DOOR_FIRST && t <= T_DOOR_LAST;
 
+// The ROM's 8.8 fixed-point forms of the physics parameters.
+const fixed = (p) => ({
+  jumpVy: Math.round(p.jumpSpeed * 256),                 // $0580 (5.5), positive = up
+  gravity: Math.round(p.gravity * 256),                  // $00C0 (0.75), subtracted per step
+  terminalHi: (256 - p.maxFallSpeed) & 0xFF,             // $F9: high byte clamp while falling
+  safeHi: (256 - (p.deadlyFallSpeed - 1)) & 0xFF,        // $FA: landing below this kills
+});
+
 export class Player {
-  constructor() {
+  // physics: a parameter set from physics.js, read live (the editor changes it in play)
+  constructor(physics = physicsFrom()) {
+    this.physics = physics;
     this.events = [];
     this.lives = 4;
     this.reset({ x: 0x40, y: 0x1F, facing: FACE_RIGHT });
@@ -55,7 +62,7 @@ export class Player {
   emit(type, data = {}) { this.events.push({ type, ...data }); }
 
   update(room, input, frame) {
-    const tick = frame & 3;
+    const steps = this.physics.stepFrames, tick = frame % steps;
     if (this.splat) { this.updateSplat(); return; }
     if (this.midairDeath) this.midairDeath--;
 
@@ -66,34 +73,53 @@ export class Player {
     } else {
       this.jumpLatch = false;
     }
-    if (this.air && tick === 0) this.airTick(room);
-    if (tick === 1) this.touchItems(room);
+    if (this.air && tick === 0) {
+      if (this.physics.airControl) this.steer(input);
+      this.airTick(room);
+    }
+    if (tick === (steps > 1 ? 1 : 0)) this.touchItems(room);
   }
 
-  // [$BD0F] Walking, one hpos per tick. Ends regeneration.
+  // Air control (not in the ROM): a held direction turns the jump that way.
+  steer(input) {
+    if (this.dead) return;
+    const right = input.isDown('right'), left = input.isDown('left');
+    if (right === left) return;
+    this.facing = right ? FACE_RIGHT : FACE_LEFT;
+    this.vertical = false;
+  }
+
+  // [$BD0F] Walking, physics.walkSpeed hpos per step (1 in the ROM). Ends regeneration.
   walk(room, input) {
     this.running = false;
     if (this.climbing || this.dead || this.air) return;
     const right = input.isDown('right'), left = input.isDown('left');
     if (!right && !left) return;
+    for (let i = 0; i < this.physics.walkSpeed; i++) if (!this.walkStep(room, right)) return;
+  }
+
+  // One pixel of walking; false when blocked, through a door, or off an edge.
+  walkStep(room, right) {
+    this.running = false;
     const dir = right ? 1 : -1;
     const probeX = right ? this.x + 7 : this.x;
     const t = room.tileAt(probeX, this.y + 8);
     this.regen = false;
     if ((right ? this.x >= DOOR_RIGHT_X : this.x <= DOOR_LEFT_X) && isDoor(t)) {
       this.emit('door', { side: right ? 'right' : 'left' });
-      return;
+      return false;
     }
-    if (isItem(t)) { this.pickUp(room, probeX, this.y + 8, t); return; }
-    if (t > 6) return;
+    if (isItem(t)) { this.pickUp(room, probeX, this.y + 8, t); return false; }
+    if (t > 6) return false;
     this.x = (this.x + dir) & 0xFF;
     this.facing = right ? FACE_RIGHT : FACE_LEFT;
-    if (room.tileAt(this.x + 3, this.y + 15) === T_FLOOR) { this.running = true; return; }
+    if (room.tileAt(this.x + 3, this.y + 15) === T_FLOOR) { this.running = true; return true; }
     // Walked off an edge: one extra step out and one line down, then fall.
     this.air = true;
     this.x = (this.x + dir) & 0xFF;
     this.y = (this.y + 1) & 0xFF;
     this.vyHi = 0xFF;
+    return false;
   }
 
   // [$C26B] Jump from the ground or off a rope (off a rope needs a direction).
@@ -107,20 +133,25 @@ export class Player {
     this.air = true;
     this.climbing = false;
     this.jumpLatch = true;
-    this.vy = JUMP_VY;
+    this.vy = fixed(this.physics).jumpVy;
     this.emit('sound', { name: 'jump' });
   }
 
-  // [$BFEB] Air: horizontal step with wall bounce, then vertical, then rope catch [$C19A].
+  // [$BFEB] Air: horizontal steps with wall bounce, then vertical, then rope catch [$C19A].
   airTick(room) {
-    if (!this.vertical && !this.dead) {
+    for (let i = 0; i < this.physics.airSpeed && !this.vertical && !this.dead; i++) {
       const left = this.facing === FACE_LEFT;
       this.x = (this.x + (left ? -1 : 1)) & 0xFF;
       if (isWall(room.tileAt(this.x + (left ? 1 : 6), this.y + 15))) {
         this.x = (this.x + (left ? 1 : -1)) & 0xFF;
-        this.facing = left ? FACE_RIGHT : FACE_LEFT;
-        if (this.vyHi < 0x80) this.vyHi = (-this.vyHi) & 0xFF;   // rising: bounce downward
+        if (this.physics.wallBounce) {
+          this.facing = left ? FACE_RIGHT : FACE_LEFT;
+          if (this.vyHi < 0x80) this.vyHi = (-this.vyHi) & 0xFF;   // rising: bounce downward
+        } else {
+          this.vertical = true;                                    // no bounce: drop straight down
+        }
         this.emit('sound', { name: 'bump' });
+        break;
       }
     }
     if (!this.midairDeath && this.fall(room)) return;
@@ -129,6 +160,7 @@ export class Player {
 
   // Vertical motion. Returns true if the player died on landing.
   fall(room) {
+    const f = fixed(this.physics);
     if (this.vyHi >= 0x80 &&
         room.tileAt(this.x + 3, this.y + 16) === T_FLOOR &&
         room.tileAt(this.x + 3, (this.y + 16 - this.vyHi) & 0xFF) !== T_FLOOR) {
@@ -137,17 +169,17 @@ export class Player {
       this.emit('sound', { name: 'stop' });            // [$C134] every landing silences both channels
       if (this.dead) {
         this.startSplat();                              // [$C13D]
-        if (this.vyHi < SAFE_LANDING_HI) this.emit('sound', { name: 'splat' });   // and again via $B812
+        if (this.vyHi < f.safeHi) this.emit('sound', { name: 'splat' });   // and again via $B812
         return true;
       }
-      if (this.vyHi < SAFE_LANDING_HI) { this.kill(); return true; }
+      if (this.vyHi < f.safeHi) { this.kill(); return true; }
       this.vyHi = 0;
       return false;
     }
     this.y = (this.y - this.vyHi) & 0xFF;
     if (this.y > 0xF0) this.vyHi = 0xFF;
-    this.vy = this.vy - GRAVITY;
-    if (this.vyHi > 0x80 && this.vyHi < TERMINAL_HI) this.vyHi = TERMINAL_HI;
+    this.vy = this.vy - f.gravity;
+    if (this.vyHi > 0x80 && this.vyHi < f.terminalHi) this.vyHi = f.terminalHi;
     return false;
   }
 
@@ -170,7 +202,8 @@ export class Player {
     this.hangSide = 0;
   }
 
-  // [$B52B] Rope: up 1 line / tick, down 2; off the bottom falls straight down.
+  // [$B52B] Rope: up climbUpSpeed lines per step (1), down climbDownSpeed (2); off the bottom
+  // falls straight down.
   climb(room, input) {
     const up = input.isDown('up'), down = input.isDown('down');
     if ((!up && !down) || this.hanging) { this.hang(room, input); return; }
@@ -179,12 +212,15 @@ export class Player {
       return t === T_ROPE || t === T_ROPE_TOP;
     };
     if (up) {
-      if (!onRope(this.y - 1)) return;
-      this.y--;
-      if (this.y & 1) this.emit('sound', { name: 'climbUp', randomPitch: true });     // [$B579]
+      let sound = false;
+      for (let i = 0; i < this.physics.climbUpSpeed && onRope(this.y - 1); i++) {
+        this.y--;
+        if (this.y & 1) sound = true;
+      }
+      if (sound) this.emit('sound', { name: 'climbUp', randomPitch: true });          // [$B579]
       return;
     }
-    const ny = this.y + 2;
+    const ny = this.y + this.physics.climbDownSpeed;
     if (!onRope(ny)) {
       this.climbing = false;
       this.air = true;
@@ -196,17 +232,18 @@ export class Player {
     this.y = ny;
   }
 
-  // [$B620] Left/right on a rope: after HOLD_TICKS shift 4 to hang beside it; from a hang,
-  // HOLD_TICKS back returns to the rope, HOLD_TICKS away lets go.
+  // [$B620] Left/right on a rope: after ropeHoldSteps (6) shift 4 to hang beside it; from a
+  // hang, ropeHoldSteps back returns to the rope, ropeHoldSteps away lets go.
   hang(room, input) {
+    const hold = this.physics.ropeHoldSteps;
     const right = input.isDown('right'), left = input.isDown('left');
     if (!right && !left) return;
     const want = right ? FACE_RIGHT : FACE_LEFT, dx = right ? 4 : -4;
     if (!this.hanging) {
-      if (this.holdCount === 0) { this.holdCount = HOLD_TICKS; return; }
+      if (this.holdCount === 0) { this.holdCount = hold; return; }
       if (--this.holdCount) return;
       this.hanging = true;
-      this.holdCount = HOLD_TICKS;
+      this.holdCount = hold;
       const t = room.tileAt(this.x + (right ? 8 : -8), this.y + 8);
       if (t >= 6 && t < T_ITEM_FIRST) { this.holdCount = 0; this.hanging = false; return; }
       this.facing = want;
@@ -214,7 +251,7 @@ export class Player {
       this.x = (this.x + dx) & 0xFF;
       return;
     }
-    if (this.facing !== want) { this.facing = want; this.holdCount = HOLD_TICKS; return; }
+    if (this.facing !== want) { this.facing = want; this.holdCount = hold; return; }
     if (--this.holdCount) return;
     this.x = (this.x + dx) & 0xFF;
     this.hanging = false;

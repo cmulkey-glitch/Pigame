@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamber Editor</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #07060d;
+    --panel: #110f1f;
+    --pad: #17142a;
+    --edge: #3a3263;
+    --ink: #cfc6ff;
+    --dim: #8a82b8;
+    --accent: #add300;
+    --accent-ink: #10140a;
+    --warn: #ff9b6a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; border-bottom: 1px solid var(--edge); background: var(--panel);
+  }
+  header h1 { font-size: 14px; margin: 0 12px 0 0; letter-spacing: .08em; }
+  header .spacer { flex: 1; }
+  button, select, input[type=number] {
+    font: inherit; color: var(--ink); background: var(--pad);
+    border: 1px solid var(--edge); border-radius: 6px; padding: 5px 10px;
+  }
+  button { cursor: pointer; }
+  button:hover, a.button:hover { border-color: var(--dim); }
+  a.button {
+    font: inherit; color: var(--ink); background: var(--pad); text-decoration: none;
+    border: 1px solid var(--edge); border-radius: 6px; padding: 5px 10px;
+  }
+  button.armed { background: var(--warn); color: var(--accent-ink); border-color: var(--warn); }
+  button.on, button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:focus-visible, a.button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  main {
+    display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px;
+    padding: 16px; max-width: 1500px; margin-inline: auto;
+  }
+  @media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .stage { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  canvas {
+    width: 100%; max-width: 1280px; aspect-ratio: 320 / 200; image-rendering: pixelated;
+    background: #000; border: 1px solid var(--edge); cursor: crosshair; touch-action: none;
+  }
+  canvas.playing { cursor: default; border-color: var(--accent); }
+  #status { color: var(--dim); min-height: 1.4em; }
+  #status.warn, #jumpinfo.warn { color: var(--warn); }
+  #jumpinfo { border: 1px solid var(--edge); border-radius: 6px; padding: 8px; }
+  .hint { color: var(--dim); }
+  aside { background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; min-width: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--edge); }
+  .tabs button {
+    flex: 1; border: 0; border-radius: 0; background: none; padding: 9px 4px; color: var(--dim);
+    border-bottom: 2px solid transparent;
+  }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); background: none; }
+  .panel { padding: 12px; display: none; flex-direction: column; gap: 10px; }
+  .panel.on { display: flex; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+  .swatch {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px;
+    font-size: 11px; text-align: center;
+  }
+  .swatch canvas { width: 64px; height: 32px; border: 0; cursor: inherit; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .colors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .colors label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--dim); }
+  input[type=color] { width: 100%; height: 26px; border: 1px solid var(--edge); background: none; padding: 0; }
+  .door { border: 1px solid var(--edge); border-radius: 6px; padding: 8px; display: grid; gap: 6px; }
+  .door .row label { display: flex; align-items: center; gap: 4px; }
+  .door input[type=number] { width: 58px; }
+  .slider { display: grid; gap: 2px; }
+  .slider .top { display: flex; justify-content: space-between; gap: 8px; }
+  .slider output { color: var(--accent); }
+  .slider input[type=range] { width: 100%; accent-color: var(--accent); }
+  .slider small { color: var(--dim); }
+  .changed { color: var(--accent); }
+  h2 { font-size: 12px; margin: 4px 0 0; color: var(--dim); letter-spacing: .06em; font-weight: normal; }
+  kbd { background: var(--pad); border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CHAMBER EDITOR</h1>
+  <select id="chamber" aria-label="Chamber"></select>
+  <button id="play" class="primary">▶ Play-test</button>
+  <label class="row hint"><input type="checkbox" id="nodrops"> no drops</label>
+  <span class="spacer"></span>
+  <a id="open-game" class="button" href="index.html?pack=editor" target="_blank" rel="noopener">Open in game</a>
+  <button id="copy" title="Copy the level pack to paste into levels.json">Copy JSON</button>
+  <button id="export">Export levels.json</button>
+  <button id="import">Import…</button>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <button id="clear" title="Empty this chamber (doors stay)">Clear chamber</button>
+  <button id="revert" title="Throw away all edits and reload the ROM's chambers">Revert all</button>
+</header>
+<main>
+  <div class="stage">
+    <canvas id="screen" width="320" height="200" aria-label="Chamber"></canvas>
+    <div id="status" role="status"></div>
+    <div class="hint">
+      Left-click or drag to use the tool, right-click to remove · <kbd>G</kbd> grid · <kbd>P</kbd> play-test ·
+      <kbd>Esc</kbd> stop · in play: arrows / <kbd>Space</kbd>, physics sliders apply live
+    </div>
+  </div>
+  <aside>
+    <div class="tabs" role="tablist">
+      <button data-tab="paint" class="on">Paint</button>
+      <button data-tab="objects">Objects</button>
+      <button data-tab="doors">Doors</button>
+      <button data-tab="drops">Drops</button>
+      <button data-tab="physics">Physics</button>
+    </div>
+    <section class="panel on" id="tab-paint">
+      <div class="grid" id="tiles"></div>
+      <div class="row">
+        <label for="palette">Colour</label>
+        <select id="palette"></select>
+      </div>
+      <h2>CHAMBER COLOURS</h2>
+      <div class="colors" id="colors"></div>
+    </section>
+    <section class="panel" id="tab-objects">
+      <div class="grid" id="objtools"></div>
+      <div class="row">
+        <label for="keydoor">Key opens</label>
+        <select id="keydoor"></select>
+      </div>
+      <p class="hint">Up to 4 treasures and 4 keys per chamber. A key opens its door the moment it's picked up, in any chamber.
+        "Start here" sets where play-tests begin in this chamber (not saved).</p>
+    </section>
+    <section class="panel" id="tab-doors">
+      <p class="hint">Click near the left or right wall to add a door at that row, or use the button. Each door is one-way:
+        add one in the other chamber to come back. "Auto" arrival lands you at the door that leads back.</p>
+      <button id="add-door">+ Add door</button>
+      <div id="doors" class="grid" style="grid-template-columns: 1fr"></div>
+    </section>
+    <section class="panel" id="tab-drops">
+      <p class="hint">Click to add a drop spawn point (put them at stalactite tips), right-click to remove.
+        Drops fall from random points in the list until they reach a floor.</p>
+      <div class="row"><button id="clear-drops">Remove all drops</button> <span id="dropcount" class="hint"></span></div>
+    </section>
+    <section class="panel" id="tab-physics">
+      <div class="row"><button id="reset-physics">Reset to ROM</button>
+        <span class="hint">Saved with the levels; play-test to feel changes live.</span></div>
+      <div id="sliders" class="grid" style="grid-template-columns: 1fr; gap: 12px"></div>
+    </section>
+  </aside>
+</main>
+<script type="module" src="src/editor/editor.js"></script>
+</body>
+</html>

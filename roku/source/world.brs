@@ -181,8 +181,11 @@ function Drops_new(def as object, room as integer, difficulty as integer, rng as
     for each s in def.dropSpawns
         d.spawns.Push({ x: s[0], y: s[1] })
     end for
-    if room = 8 then d.mask = &h3F else d.mask = &h1F
-    if difficulty = 2 and not d.title then                  ' [$B087]
+    ' 32 spawn points (chamber 8 has 64); a chamber made without any has no drops
+    if d.spawns.Count() = 0 then return d
+    if d.spawns.Count() > 32 then d.mask = &h3F else d.mask = &h1F
+    tweak = def.dropTweak
+    if difficulty = 2 and not d.title and tweak > 0 and tweak < d.spawns.Count() then   ' [$B087]
         i = def.dropTweak
         s = d.spawns[i]
         s.x = (s.x - 2) and &hFF

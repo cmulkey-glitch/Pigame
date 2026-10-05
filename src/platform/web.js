@@ -12,7 +12,10 @@ export async function createPlatform(canvas) {
 
   const held = new Set();
   const pressed = [];  // one-shot keys (chamber select etc.)
+  // Keys typed into form fields (the editor's panels) aren't game input.
+  const isField = (e) => e.target instanceof Element && e.target.closest('input, select, textarea');
   addEventListener('keydown', (e) => {
+    if (isField(e)) return;
     if (KEYMAP[e.code]) { held.add(KEYMAP[e.code]); e.preventDefault(); }
     if (!e.repeat) pressed.push(e.key);
   });

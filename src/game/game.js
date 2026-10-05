@@ -10,6 +10,7 @@ import { Drops, NO_DROPS } from './drops.js';
 import { Rng } from './rng.js';
 import { newGameState, collect } from './state.js';
 import { SoundDriver } from './sound.js';
+import { physicsFrom } from './physics.js';
 import { Ball, Bird, TIMER_FULL, TIMER_AFTER_BIRD_DEATH, TIMER_CHAMBER_X, returnTimer } from './enemies.js';
 
 const HUD_H = 8;
@@ -30,16 +31,19 @@ export class Game {
     this.mode = 'title';
   }
 
-  async load(base = '.') {
+  // rooms: a level pack to play instead of data/rooms.json (the editor's play-test)
+  async load(base = '.', rooms = null) {
     const p = this.p;
-    const [rooms, tileBmp, sprites, spriteBmp, sounds] = await Promise.all([
-      p.loadJSON(base + '/data/rooms.json'),
+    const [roomData, tileBmp, sprites, spriteBmp, sounds] = await Promise.all([
+      rooms || p.loadJSON(base + '/data/rooms.json'),
       p.loadBitmap(base + '/assets/tiles.png'),
       p.loadJSON(base + '/assets/sprites.json'),
       p.loadBitmap(base + '/assets/sprites.png'),
       p.loadJSON(base + '/data/sounds.json'),
     ]);
+    rooms = roomData;
     this.sound = new SoundDriver(sounds.sounds);
+    this.physics = physicsFrom(rooms.physics);   // live: the editor's sliders change it in play
     this.defs = rooms.rooms;
     this.titleDef = rooms.title;
     this.doorOpenInitial = rooms.doorOpenInitial;
@@ -121,7 +125,7 @@ export class Game {
 
   startGame() {
     this.mode = 'play';
-    this.player = new Player();
+    this.player = new Player(this.physics);
     this.player.lives = this.difficulty === 0 ? 5 : 4;
     this.score = 0; this.keys = 0;
     this.state = newGameState(this.defs, this.doorOpenInitial);

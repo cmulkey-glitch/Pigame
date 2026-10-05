@@ -46,6 +46,19 @@ python3 tools/trace_rules.py   path/to/Downland.a78
 python3 tools/trace_sound.py   path/to/Downland.a78
 ```
 
+## Chamber editor
+`editor.html` (serve the repo root, e.g. `python3 -m http.server`, then open `/editor.html`):
+paint terrain, place treasures, keys, doors, drop points and the ball, and tune the player
+physics with sliders. **Play-test** runs the chamber with the real game code; slider changes
+apply live, and the physics panel shows the jump's height, reach and landing speed (and warns
+when your own jump would kill you on flat ground). Edits autosave in the browser; **Export**
+writes `levels.json`, **Open in game** plays them in `index.html?pack=editor`.
+
+Physics parameters live in `src/game/physics.js` (`roku/source/physics.brs` on Roku). The
+defaults are the ROM's, so the ROM trace tests check them; `tests/traces/physics_custom.json`
+(from `tools/record_custom_physics.mjs`) checks the Roku player matches the JS one with other
+settings. A level pack is the `rooms.json` format plus an optional `physics` object.
+
 ## Roku (sideload prototype)
 `roku/source/` is a BrightScript port of `src/game/` (`player.brs`, `world.brs`, `game.brs`)
 plus `main.brs` for the screen, remote and sound. Chamber art is pre-rendered, text and items
@@ -53,7 +66,7 @@ are drawn from pre-tinted copies of the tile atlas, and sound effects are WAVs r
 same driver + TIA synth as the web (`tools/render_sounds.mjs`), since Roku can't synthesize.
 ```
 node tools/test_roku.mjs          # ROM trace checks (device for-each semantics) + compile check (npm i -g brs brighterscript)
-python3 tools/build_roku.py       # -> dist/downland-roku.zip
+python3 tools/build_roku.py       # -> dist/downland-roku.zip (--pack levels.json for editor levels)
 ```
 Sideload: enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, Right),
 open `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press Install.

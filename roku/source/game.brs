@@ -1,5 +1,6 @@
 ' Game controller: title screen, play, game over and the escape ending (BrightScript version
 ' of src/game/game.js, minus drawing). main.brs feeds it input and draws its state.
+'   data:    { rooms, title, doorOpenInitial, sounds, physics (optional overrides) }
 '   input:   AA of booleans left, right, up, down, jump
 '   actions: array of strings from the remote: "title", "prev", "next", "difficulty"
 '   m.sfx:   queue of { kind: "play", name, pitch, ch } / { kind: "stop" } for main.brs to play
@@ -7,6 +8,7 @@
 function Game_new(data as object) as object
     g = {
         defs: data.rooms, titleDef: data.title, doorOpenInitial: data.doorOpenInitial
+        physics: Physics_from(data.physics)
         rng: Rng_new(), frame: 0, difficulty: 1, beginner: false, escapeMode: false
         hiScore: 0, mode: "title", sfx: []
         sound: SoundDriver_new(data.sounds)
@@ -72,7 +74,7 @@ end sub
 ' ---- play ----
 sub Game_startGame()
     m.mode = "play"
-    m.player = Player_new()
+    m.player = Player_new(m.physics)
     if m.difficulty = 0 then m.player.lives = 5 else m.player.lives = 4
     m.score = 0 : m.keys = 0
     m.state = NewGameState(m.defs, m.doorOpenInitial)

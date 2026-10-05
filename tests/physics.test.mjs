@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Room } from '../src/game/room.js';
 import { Player } from '../src/game/player.js';
+import { physicsFrom, jumpProfile } from '../src/game/physics.js';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'traces');
 
@@ -14,8 +15,8 @@ function makeRoom(map) {
   return room;
 }
 
-function loadPlayer(s) {
-  const p = new Player();
+function loadPlayer(s, physics) {
+  const p = new Player(physics);
   p.x = s.x; p.y = s.y; p.facing = s.facing;
   p.vyHi = s.vyHi; p.vyLo = s.vyLo;
   p.air = !!(s.f1 & 0x01); p.vertical = !!(s.f1 & 0x02); p.regen = !!(s.f1 & 0x04);
@@ -41,11 +42,17 @@ const input = (s) => ({
 });
 
 let failed = 0;
+// ROM traces, plus runs with non-ROM physics (tools/record_custom_physics.mjs; mainly there
+// for the BrightScript player, here they guard against the JS player drifting).
+const runs = [];
 for (const file of readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('drops_')).sort()) {
   const t = JSON.parse(readFileSync(join(dir, file)));
-  if (!t.start || t.start.facing === undefined) continue;   // not a player trace
+  if (t.cases) runs.push(...t.cases);
+  else if (t.start && t.start.facing !== undefined) runs.push(t);   // else not a player trace
+}
+for (const t of runs) {
   const room = makeRoom(t.start.map);
-  const p = loadPlayer(t.start);
+  const p = loadPlayer(t.start, physicsFrom(t.physics));
   let bad = null;
   t.frames.forEach((f, i) => {
     if (bad) return;
@@ -66,5 +73,30 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith('.json') && !f.star
   } else {
     console.log(`ok   ${t.name} (${t.frames.length} frames)`);
   }
+}
+// The editor's jump readout (jumpProfile) against the real player: a running jump on a flat
+// floor, over a sweep of settings.
+{
+  let checked = 0;
+  const bad = [];
+  for (const jumpSpeed of [2, 3.5, 5.5, 7, 8]) for (const gravity of [0.25, 0.5, 0.75, 1.25, 2])
+  for (const maxFallSpeed of [3, 7, 8]) for (const deadlyFallSpeed of [3, 7, 9]) for (const airSpeed of [0, 1, 3]) {
+    const set = { jumpSpeed, gravity, maxFallSpeed, deadlyFallSpeed, airSpeed };
+    const prof = jumpProfile(set);
+    if (prof.distance > 0x8C - 0x30 || prof.height > 170) continue;   // would leave the screen
+    const ph = physicsFrom(set);
+    const room = makeRoom(Array.from({ length: 480 }, (_, i) => (i >= 460 ? 4 : 0)));   // floor on row 23
+    const p = new Player(ph);
+    p.reset({ x: 0x30, y: 183, facing: 2 });
+    const jump = input('RJ'), none = input('');
+    let f = 1, top = 183, dead = false;
+    p.update(room, jump, f);
+    while (p.air && f < 4000) { p.update(room, none, ++f); top = Math.min(top, p.y); dead ||= p.dead; }
+    if (prof.height !== 183 - top || prof.distance !== p.x - 0x30 || prof.kills !== dead)
+      bad.push(`${JSON.stringify(set)}: player ${183 - top}/${p.x - 0x30}/${dead} profile ${prof.height}/${prof.distance}/${prof.kills}`);
+    checked++;
+  }
+  if (bad.length) { failed++; console.log(`FAIL jump readout: ${bad.length}/${checked} differ, e.g. ${bad[0]}`); }
+  else console.log(`ok   jump readout matches the player (${checked} settings)`);
 }
 process.exit(failed ? 1 : 0);

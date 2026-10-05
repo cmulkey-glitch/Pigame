@@ -10,9 +10,12 @@ extracted data (the same files the web port uses):
   data/*.json            rooms, sprites, sounds
   sounds/*.wav           effects rendered by tools/render_sounds.mjs
 
-Needs Pillow and node. Usage: python3 tools/build_roku.py
+Needs Pillow and node. Usage: python3 tools/build_roku.py [--pack levels.json]
+--pack builds with a level pack exported from the chamber editor (editor.html), physics
+included, instead of the ROM's chambers.
 Sideload: open http://<roku-ip> (developer mode) and upload the zip.
 """
+import argparse
 import json
 import os
 import shutil
@@ -70,6 +73,9 @@ def icon(src, w, h):
 
 
 def main():
+    args = argparse.ArgumentParser(description='Build the Roku sideload zip.')
+    args.add_argument('--pack', help='level pack from the chamber editor (default: data/rooms.json)')
+    pack = args.parse_args().pack or os.path.join(ROOT, 'data', 'rooms.json')
     shutil.rmtree(STAGE, ignore_errors=True)
     for d in ('source', 'images', 'data', 'sounds'):
         os.makedirs(os.path.join(STAGE, d))
@@ -77,11 +83,12 @@ def main():
     for f in sorted(os.listdir(os.path.join(ROOT, 'roku', 'source'))):
         if f.endswith('.brs'):
             shutil.copy(os.path.join(ROOT, 'roku', 'source', f), os.path.join(STAGE, 'source'))
-    for src, dst in (('data/rooms.json', 'data'), ('data/sounds.json', 'data'),
+    shutil.copy(pack, os.path.join(STAGE, 'data', 'rooms.json'))
+    for src, dst in (('data/sounds.json', 'data'),
                      ('assets/sprites.json', 'data'), ('assets/sprites.png', 'images')):
         shutil.copy(os.path.join(ROOT, src), os.path.join(STAGE, dst))
 
-    rooms = json.load(open(os.path.join(ROOT, 'data', 'rooms.json')))
+    rooms = json.load(open(pack))
     atlas = Image.open(os.path.join(ROOT, 'assets', 'tiles.png')).convert('RGBA')
     masks = tile_masks(atlas)
     img = os.path.join(STAGE, 'images')

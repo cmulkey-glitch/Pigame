@@ -1,12 +1,15 @@
 ' Player logic ported from the Atari 7800 Downland ROM (BrightScript version of
 ' src/game/player.js; see docs/PHYSICS.md). Units are the 7800's: x = MARIA hpos, y = line
-' with 0 at the top of the HUD row. Movement runs on a 4-frame tick (tick = frame and 3).
-' input is an AA of booleans: left, right, up, down, jump.
+' with 0 at the top of the HUD row. Movement runs once per step of physics.stepFrames frames
+' (the ROM's 4-frame tick). physics comes from Physics_from (physics.brs); with the defaults
+' this is the ROM. input is an AA of booleans: left, right, up, down, jump.
 
-function Player_new() as object
+function Player_new(physics = invalid as object) as object
+    if physics = invalid then physics = Physics_from(invalid)
     p = {
-        events: [], lives: 4
-        reset: Player_reset, update: Player_update, walk: Player_walk
+        events: [], lives: 4, physics: physics
+        reset: Player_reset, update: Player_update, walk: Player_walk, walkStep: Player_walkStep
+        steer: Player_steer
         startJump: Player_startJump, airTick: Player_airTick, fall: Player_fall
         catchRope: Player_catchRope, climb: Player_climb, hang: Player_hang
         touchItems: Player_touchItems, pickUp: Player_pickUp, kill: Player_kill
@@ -51,7 +54,8 @@ function Pl_isDoor(t as integer) as boolean
 end function
 
 sub Player_update(room as object, input as object, frame as integer)
-    tick = frame and 3
+    steps = m.physics.stepFrames
+    tick = frame mod steps
     if m.splat > 0 then
         m.updateSplat()
         return
@@ -64,16 +68,35 @@ sub Player_update(room as object, input as object, frame as integer)
     else
         m.jumpLatch = false
     end if
-    if m.air and tick = 0 then m.airTick(room)
-    if tick = 1 then m.touchItems(room)
+    if m.air and tick = 0 then
+        if m.physics.airControl <> 0 then m.steer(input)
+        m.airTick(room)
+    end if
+    if steps > 1 then touchTick = 1 else touchTick = 0
+    if tick = touchTick then m.touchItems(room)
 end sub
 
-' [$BD0F] Walking, one hpos per tick. Ends regeneration.
+' Air control (not in the ROM): a held direction turns the jump that way.
+sub Player_steer(input as object)
+    if m.dead or input.right = input.left then return
+    if input.right then m.facing = 2 else m.facing = 1
+    m.vertical = false
+end sub
+
+' [$BD0F] Walking, physics.walkSpeed hpos per step (1 in the ROM). Ends regeneration.
 sub Player_walk(room as object, input as object)
     m.running = false
     if m.climbing or m.dead or m.air then return
     right = input.right : left = input.left
     if not right and not left then return
+    for i = 1 to m.physics.walkSpeed
+        if not m.walkStep(room, right) then return
+    end for
+end sub
+
+' One pixel of walking; false when blocked, through a door, or off an edge.
+function Player_walkStep(room as object, right as boolean) as boolean
+    m.running = false
     if right then
         dirn = 1 : probeX = m.x + 7
     else
@@ -85,25 +108,26 @@ sub Player_walk(room as object, input as object)
     if atDoor and Pl_isDoor(t) then
         if right then side = "right" else side = "left"
         m.emit({ kind: "door", side: side })
-        return
+        return false
     end if
     if Pl_isItem(t) then
         m.pickUp(room, probeX, m.y + 8, t)
-        return
+        return false
     end if
-    if t > 6 then return
+    if t > 6 then return false
     m.x = (m.x + dirn) and &hFF
     if right then m.facing = 2 else m.facing = 1
     if room.tileAt(m.x + 3, m.y + 15) = &h04 then
         m.running = true
-        return
+        return true
     end if
     ' walked off an edge: one extra step out and one line down, then fall
     m.air = true
     m.x = (m.x + dirn) and &hFF
     m.y = (m.y + 1) and &hFF
     m.vyHi = &hFF
-end sub
+    return false
+end function
 
 ' [$C26B] Jump from the ground or off a rope (off a rope needs a direction).
 sub Player_startJump(input as object)
@@ -119,31 +143,35 @@ sub Player_startJump(input as object)
     m.air = true
     m.climbing = false
     m.jumpLatch = true
-    m.vyHi = &h05 : m.vyLo = &h80
+    m.vyHi = (m.physics.jumpVy >> 8) and &hFF : m.vyLo = m.physics.jumpVy and &hFF
     m.emit({ kind: "sound", name: "jump" })
 end sub
 
-' [$BFEB] Air: horizontal step with wall bounce, then vertical, then rope catch.
+' [$BFEB] Air: horizontal steps with wall bounce, then vertical, then rope catch.
 sub Player_airTick(room as object)
-    if not m.vertical and not m.dead then
+    for i = 1 to m.physics.airSpeed
+        if m.vertical or m.dead then exit for
         if m.facing = 1 then
             m.x = (m.x - 1) and &hFF
-            if Pl_isWall(room.tileAt(m.x + 1, m.y + 15)) then
-                m.x = (m.x + 1) and &hFF
-                m.facing = 2
-                if m.vyHi < &h80 then m.vyHi = (256 - m.vyHi) and &hFF
-                m.emit({ kind: "sound", name: "bump" })
-            end if
+            hit = Pl_isWall(room.tileAt(m.x + 1, m.y + 15))
+            back = 1
         else
             m.x = (m.x + 1) and &hFF
-            if Pl_isWall(room.tileAt(m.x + 6, m.y + 15)) then
-                m.x = (m.x - 1) and &hFF
-                m.facing = 1
-                if m.vyHi < &h80 then m.vyHi = (256 - m.vyHi) and &hFF
-                m.emit({ kind: "sound", name: "bump" })
-            end if
+            hit = Pl_isWall(room.tileAt(m.x + 6, m.y + 15))
+            back = -1
         end if
-    end if
+        if hit then
+            m.x = (m.x + back) and &hFF
+            if m.physics.wallBounce <> 0 then
+                m.facing = 3 - m.facing
+                if m.vyHi < &h80 then m.vyHi = (256 - m.vyHi) and &hFF   ' rising: bounce downward
+            else
+                m.vertical = true                                        ' no bounce: drop straight down
+            end if
+            m.emit({ kind: "sound", name: "bump" })
+            exit for
+        end if
+    end for
     if m.midairDeath = 0 then
         if m.fall(room) then return
     end if
@@ -159,10 +187,10 @@ function Player_fall(room as object) as boolean
             m.emit({ kind: "sound", name: "stop" })   ' [$C134] every landing silences both channels
             if m.dead then
                 m.startSplat()
-                if m.vyHi < &hFA then m.emit({ kind: "sound", name: "splat" })
+                if m.vyHi < m.physics.safeHi then m.emit({ kind: "sound", name: "splat" })
                 return true
             end if
-            if m.vyHi < &hFA then
+            if m.vyHi < m.physics.safeHi then
                 m.kill()
                 return true
             end if
@@ -172,9 +200,9 @@ function Player_fall(room as object) as boolean
     end if
     m.y = (m.y - m.vyHi) and &hFF
     if m.y > &hF0 then m.vyHi = &hFF
-    vy = ((m.vyHi * 256 + m.vyLo) - &hC0) and &hFFFF      ' gravity
+    vy = ((m.vyHi * 256 + m.vyLo) - m.physics.gravityFixed) and &hFFFF      ' gravity
     m.vyHi = vy >> 8 : m.vyLo = vy and &hFF
-    if m.vyHi > &h80 and m.vyHi < &hF9 then m.vyHi = &hF9  ' terminal speed
+    if m.vyHi > &h80 and m.vyHi < m.physics.terminalHi then m.vyHi = m.physics.terminalHi  ' terminal speed
     return false
 end function
 
@@ -202,7 +230,8 @@ function Pl_onRope(room as object, x as integer, y as integer) as boolean
     return t = &h02 or t = &h2C
 end function
 
-' [$B52B] Rope: up 1 line / tick, down 2; off the bottom falls straight down.
+' [$B52B] Rope: up climbUpSpeed lines per step (1), down climbDownSpeed (2); off the bottom
+' falls straight down.
 sub Player_climb(room as object, input as object)
     up = input.up : down = input.down
     if (not up and not down) or m.hanging then
@@ -210,12 +239,16 @@ sub Player_climb(room as object, input as object)
         return
     end if
     if up then
-        if not Pl_onRope(room, m.x, m.y - 1) then return
-        m.y = m.y - 1
-        if (m.y and 1) <> 0 then m.emit({ kind: "sound", name: "climbUp", randomPitch: true })
+        sound = false
+        for i = 1 to m.physics.climbUpSpeed
+            if not Pl_onRope(room, m.x, m.y - 1) then exit for
+            m.y = m.y - 1
+            if (m.y and 1) <> 0 then sound = true
+        end for
+        if sound then m.emit({ kind: "sound", name: "climbUp", randomPitch: true })
         return
     end if
-    ny = m.y + 2
+    ny = m.y + m.physics.climbDownSpeed
     if not Pl_onRope(room, m.x, ny) then
         m.climbing = false
         m.air = true
@@ -227,9 +260,10 @@ sub Player_climb(room as object, input as object)
     m.y = ny
 end sub
 
-' [$B620] Left/right on a rope: after 6 ticks shift 4 to hang beside it; from a hang,
-' 6 ticks back returns to the rope, 6 ticks away lets go.
+' [$B620] Left/right on a rope: after ropeHoldSteps (6) shift 4 to hang beside it; from a
+' hang, ropeHoldSteps back returns to the rope, ropeHoldSteps away lets go.
 sub Player_hang(room as object, input as object)
+    hold = m.physics.ropeHoldSteps
     right = input.right : left = input.left
     if not right and not left then return
     if right then
@@ -239,13 +273,13 @@ sub Player_hang(room as object, input as object)
     end if
     if not m.hanging then
         if m.holdCount = 0 then
-            m.holdCount = 6
+            m.holdCount = hold
             return
         end if
         m.holdCount = m.holdCount - 1
         if m.holdCount > 0 then return
         m.hanging = true
-        m.holdCount = 6
+        m.holdCount = hold
         if right then t = room.tileAt(m.x + 8, m.y + 8) else t = room.tileAt(m.x - 8, m.y + 8)
         if t >= 6 and t < &h20 then
             m.holdCount = 0
@@ -259,7 +293,7 @@ sub Player_hang(room as object, input as object)
     end if
     if m.facing <> want then
         m.facing = want
-        m.holdCount = 6
+        m.holdCount = hold
         return
     end if
     m.holdCount = m.holdCount - 1

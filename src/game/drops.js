@@ -14,9 +14,10 @@ export class Drops {
     this.difficulty = difficulty;
     this.title = room === -1;
     this.spawns = def.dropSpawns.map(([x, y]) => ({ x, y }));
-    this.mask = room === 8 ? 0x3F : 0x1F;
+    // 32 spawn points (chamber 8 has 64); a chamber made without any has no drops
+    this.mask = this.spawns.length > 32 ? 0x3F : 0x1F;
     // [$B087] Difficulty 2 moves one spawn point and duplicates it into its neighbour.
-    if (difficulty === 2 && !this.title) {
+    if (difficulty === 2 && !this.title && def.dropTweak > 0 && def.dropTweak < this.spawns.length) {
       const i = def.dropTweak, s = this.spawns[i];
       s.x = (s.x - 2) & 0xFF;
       s.y = (s.y + 2) & 0xFF;
@@ -27,6 +28,7 @@ export class Drops {
     let last = this.title || room > 5 || difficulty === 2 ? 7 : 5;
     if (difficulty === 0 && !this.title) last = 5;
     this.slots = [];
+    if (!this.spawns.length) return;
     for (let i = 0; i <= last; i++) {
       this.slots.push({ x: 0, y: 0, timer: 0, spawn: EMPTY });
       this.spawn(this.slots[i]);   // [$B0F5] every slot starts waiting
