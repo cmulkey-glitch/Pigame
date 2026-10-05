@@ -244,7 +244,7 @@ def jump_patterns(d, rng):
             lambda: (blocks(0, 0, 4) + blocks(4, 0, 4, 2) + blocks(8, 0, 4, 3), 12),
             lambda: (blocks(0, 0, 9, 1, '^') + [('o', 2, 2), ('o', 6, 3)], 9),
             lambda: (blocks(0, 1, 3) + blocks(0, 0, 3, 1, '^') + blocks(3, 0, 3, 1, '^'), 6),
-            lambda: ([('_', 0, 0)] + blocks(1, 0, 4, 1, '^') + blocks(5, 0, 3, 3), 8),
+            lambda: ([('_', 0, 0)] + blocks(1, 0, 3, 1, '^') + blocks(4, 0, 3, 2), 7),
         ]
     if d >= 0.7:
         pats += [
