@@ -1,8 +1,8 @@
-// Run dash/tests/tests.brs (physics checks, and every level must be beatable) against
+// Run dash/tests/tests.brs (physics checks, and every stage replays its stored solution) against
 // dash/roku/source/game.brs with the brs interpreter, then compile-check dash/roku with
 // BrighterScript, whose parser matches the device.
 // Needs `npm install -g brs brighterscript`, or BRS= / BSC= paths to the binaries.
-// Usage: node dash/tools/test.mjs   (the level search takes a minute or two)
+// Usage: node dash/tools/test.mjs
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

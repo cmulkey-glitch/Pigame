@@ -1,12 +1,13 @@
-"""Build the Cube Dash sideload package: dist/cube-dash-roku.zip.
+"""Build the Spiral Shift sideload package: dist/spiral-shift-roku.zip.
 
-Stages dist/cube-dash-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
+Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
 generated assets:
-  images/cube.png, ship.png   rotation frames, 90 px squares in a strip
-  images/spike*.png, orb.png, pad.png, portal_*.png, icon_*.png, splash_hd.png
-  sounds/level1-3.wav         8-bar chiptune loops; die.wav, complete.wav
+  images/ball, triangle, square, diamond.png   player frames, 72 px squares (main.brs)
+  images/spike_N, pad_N.png                    turned for side N; orb.png; icons, splash
+  sounds/level1-10.mp3                         8-bar chiptune loops; die, complete,
+                                               checkpoint.wav
 
-Needs Pillow. Usage: python3 dash/tools/build.py
+Needs Pillow and lameenc (pip install pillow lameenc). Usage: python3 dash/tools/build.py
 Sideload: open http://<roku-ip> (developer mode) and upload the zip.
 """
 import math
@@ -17,17 +18,24 @@ import struct
 import wave
 import zipfile
 
+import lameenc
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, '..', 'roku')
 DIST = os.path.join(HERE, '..', '..', 'dist')
-STAGE = os.path.join(DIST, 'cube-dash-roku')
+STAGE = os.path.join(DIST, 'spiral-shift-roku')
 SS = 4          # supersampling for smooth edges
 RATE = 22050
 
 
 # ---- images ----
+# One block is 48 px. Player frames are 72 px squares (room to rotate); spikes and pads come
+# in four turns, one per side of the screen (see main.brs).
+
+BLOCK, CELL = 48, 72
+BALL, TRI, SQUARE, DIAMOND = (255, 210, 63), (255, 106, 213), (77, 214, 255), (124, 255, 107)
+
 
 def canvas(w, h):
     return Image.new('RGBA', (w * SS, h * SS), (0, 0, 0, 0))
@@ -37,104 +45,122 @@ def down(img):
     return img.resize((img.width // SS, img.height // SS), Image.LANCZOS)
 
 
-def cube_face(size=60):
-    """The player: green square, cyan inner square, two eyes."""
-    img = canvas(size, size)
-    d = ImageDraw.Draw(img)
-    s = size * SS
-    d.rectangle([0, 0, s - 1, s - 1], fill=(0, 0, 0, 255))
-    d.rectangle([3 * SS, 3 * SS, s - 3 * SS - 1, s - 3 * SS - 1], fill=(124, 255, 107, 255))
-    d.rectangle([15 * SS, 15 * SS, s - 15 * SS - 1, s - 15 * SS - 1], fill=(0, 0, 0, 255))
-    d.rectangle([18 * SS, 18 * SS, s - 18 * SS - 1, s - 18 * SS - 1], fill=(80, 230, 255, 255))
-    for ex in (22, 34):
-        d.rectangle([ex * SS, 24 * SS, (ex + 4) * SS, 30 * SS], fill=(0, 0, 0, 255))
-    return img
-
-
-def strip(frames, cell=90):
-    out = Image.new('RGBA', (cell * len(frames), cell), (0, 0, 0, 0))
+def sheet(frames, per_row):
+    rows = (len(frames) + per_row - 1) // per_row
+    out = Image.new('RGBA', (CELL * per_row, CELL * rows), (0, 0, 0, 0))
     for i, f in enumerate(frames):
-        out.paste(f, (i * cell + (cell - f.width) // 2, (cell - f.height) // 2), f)
+        x, y = (i % per_row) * CELL, (i // per_row) * CELL
+        out.paste(f, (x + (CELL - f.width) // 2, y + (CELL - f.height) // 2), f)
     return out
 
 
-def cube_frames():
-    face = cube_face()
-    # clockwise, 0..85 degrees; a square repeats every 90
-    return [down(face.rotate(-a, resample=Image.BICUBIC, expand=True)) for a in range(0, 90, 5)]
+def turned(img, angle):
+    """img (supersampled, CELL-sized canvas) turned counter-clockwise, then shrunk."""
+    return down(img.rotate(angle, resample=Image.BICUBIC))
 
 
-def ship_body():
-    img = canvas(64, 64)
+def ball():
+    """Yellow ball with a dark band, so it can be seen rolling."""
+    img = canvas(CELL, CELL)
     d = ImageDraw.Draw(img)
-    S = SS
-    hull = [(4 * S, 30 * S), (60 * S, 38 * S), (52 * S, 50 * S), (8 * S, 52 * S)]
-    d.polygon(hull, fill=(0, 0, 0, 255))
-    inner = [(9 * S, 34 * S), (52 * S, 40 * S), (48 * S, 46 * S), (11 * S, 48 * S)]
-    d.polygon(inner, fill=(255, 106, 213, 255))
-    # the cube rides in the cockpit
-    mini = cube_face().resize((26 * S, 26 * S), Image.LANCZOS)
-    img.paste(mini, (18 * S, 8 * S), mini)
+    S, c, r = SS, CELL // 2, 23
+    d.ellipse([(c - r) * S, (c - r) * S, (c + r) * S, (c + r) * S], fill=(0, 0, 0, 255))
+    d.ellipse([(c - r + 3) * S, (c - r + 3) * S, (c + r - 3) * S, (c + r - 3) * S], fill=BALL + (255,))
+    d.rectangle([(c - r + 3) * S, (c - 4) * S, (c + r - 3) * S, (c + 4) * S], fill=(200, 120, 20, 255))
+    d.ellipse([(c - 6) * S, (c - 6) * S, (c + 6) * S, (c + 6) * S], fill=(255, 250, 220, 255))
     return img
 
 
-def ship_frames():
-    body = ship_body()
-    # -40..40 degrees, positive = nose up (counter-clockwise for a ship facing right)
-    return [down(body.rotate(a, resample=Image.BICUBIC, expand=True)) for a in range(-40, 45, 5)]
+def triangle():
+    """Pink arrowhead pointing right (the run direction on the bottom edge)."""
+    img = canvas(CELL, CELL)
+    d = ImageDraw.Draw(img)
+    S, c = SS, CELL // 2
+    d.polygon([((c - 24) * S, (c - 21) * S), ((c + 25) * S, c * S), ((c - 24) * S, (c + 21) * S)], fill=(0, 0, 0, 255))
+    d.polygon([((c - 19) * S, (c - 14) * S), ((c + 16) * S, c * S), ((c - 19) * S, (c + 14) * S)], fill=TRI + (255,))
+    d.polygon([((c - 12) * S, (c - 5) * S), ((c + 2) * S, c * S), ((c - 12) * S, (c + 5) * S)], fill=(255, 230, 248, 255))
+    return img
 
 
-def spike(flip=False):
-    img = canvas(60, 60)
+def square():
+    """Cyan square with nested squares: the same every quarter turn."""
+    img = canvas(CELL, CELL)
+    d = ImageDraw.Draw(img)
+    S, c = SS, CELL // 2
+    for half, col in ((24, (0, 0, 0)), (21, SQUARE), (13, (0, 0, 0)), (10, (200, 245, 255)), (4, (0, 0, 0))):
+        d.rectangle([(c - half) * S, (c - half) * S, (c + half) * S - 1, (c + half) * S - 1], fill=col + (255,))
+    return img
+
+
+def diamond():
+    """Green diamond, long along the run direction."""
+    img = canvas(CELL, CELL)
+    d = ImageDraw.Draw(img)
+    S, c = SS, CELL // 2
+    d.polygon([((c - 26) * S, c * S), (c * S, (c - 17) * S), ((c + 26) * S, c * S), (c * S, (c + 17) * S)], fill=(0, 0, 0, 255))
+    d.polygon([((c - 20) * S, c * S), (c * S, (c - 12) * S), ((c + 20) * S, c * S), (c * S, (c + 12) * S)], fill=DIAMOND + (255,))
+    d.polygon([((c - 8) * S, c * S), (c * S, (c - 5) * S), ((c + 8) * S, c * S), (c * S, (c + 5) * S)], fill=(230, 255, 225, 255))
+    return img
+
+
+def ball_frames():
+    b = ball()
+    return [turned(b, -a) for a in range(0, 360, 10)]                # clockwise, 10 degree steps
+
+
+def stage_frames(img, angles):
+    # row s: the shape on side s (turned 90 degrees per side), then tilted by each angle
+    return [turned(img, 90 * s + a) for s in range(4) for a in angles]
+
+
+def spike():
+    img = canvas(BLOCK, BLOCK)
     d = ImageDraw.Draw(img)
     S = SS
-    d.polygon([(2 * S, 60 * S), (30 * S, 2 * S), (58 * S, 60 * S)], fill=(255, 255, 255, 255))
-    d.polygon([(8 * S, 57 * S), (30 * S, 12 * S), (52 * S, 57 * S)], fill=(12, 12, 22, 255))
-    img = down(img)
-    return img.transpose(Image.FLIP_TOP_BOTTOM) if flip else img
-
-
-def orb():
-    img = canvas(60, 60)
-    d = ImageDraw.Draw(img)
-    S = SS
-    d.ellipse([4 * S, 4 * S, 56 * S, 56 * S], fill=(255, 225, 77, 90))
-    d.ellipse([12 * S, 12 * S, 48 * S, 48 * S], fill=(255, 225, 77, 255))
-    d.ellipse([20 * S, 20 * S, 40 * S, 40 * S], fill=(255, 255, 220, 255))
-    return down(img)
+    d.polygon([(2 * S, 48 * S), (24 * S, 2 * S), (46 * S, 48 * S)], fill=(255, 255, 255, 255))
+    d.polygon([(7 * S, 46 * S), (24 * S, 10 * S), (41 * S, 46 * S)], fill=(12, 12, 22, 255))
+    return img
 
 
 def pad():
-    img = canvas(60, 60)
+    img = canvas(BLOCK, BLOCK)
     d = ImageDraw.Draw(img)
     S = SS
-    d.pieslice([6 * S, 44 * S, 54 * S, 76 * S], 180, 360, fill=(255, 225, 77, 255))
-    d.rectangle([4 * S, 56 * S, 56 * S, 60 * S], fill=(255, 225, 77, 255))
-    return down(img)
+    d.pieslice([5 * S, 35 * S, 43 * S, 61 * S], 180, 360, fill=(255, 225, 77, 255))
+    d.rectangle([3 * S, 45 * S, 45 * S, 48 * S], fill=(255, 225, 77, 255))
+    return img
 
 
-def portal(rgb):
-    img = canvas(60, 180)
+def orb():
+    img = canvas(BLOCK, BLOCK)
     d = ImageDraw.Draw(img)
     S = SS
-    d.ellipse([8 * S, 2 * S, 52 * S, 178 * S], outline=rgb + (255,), width=8 * S)
-    d.ellipse([18 * S, 16 * S, 42 * S, 164 * S], outline=rgb + (140,), width=4 * S)
+    d.ellipse([3 * S, 3 * S, 45 * S, 45 * S], fill=(255, 225, 77, 90))
+    d.ellipse([10 * S, 10 * S, 38 * S, 38 * S], fill=(255, 225, 77, 255))
+    d.ellipse([16 * S, 16 * S, 32 * S, 32 * S], fill=(255, 255, 220, 255))
     return down(img)
 
 
 def poster(w, h):
-    img = Image.new('RGBA', (w, h), (42, 72, 232, 255))
+    """The four shapes running around the edges of a screen."""
+    img = Image.new('RGBA', (w * 2, h * 2), (42, 72, 232, 255))
     d = ImageDraw.Draw(img)
-    ground = int(h * 0.78)
-    d.rectangle([0, ground, w, h], fill=(26, 47, 168, 255))
-    d.rectangle([0, ground, w, ground + max(1, h // 200)], fill=(255, 255, 255, 200))
-    size = int(h * 0.3)
-    cube = cube_face().resize((size, size), Image.LANCZOS).rotate(-20, resample=Image.BICUBIC, expand=True)
-    img.paste(cube, (int(w * 0.18), ground - int(size * 1.6)), cube)
-    sp = spike().resize((size, size), Image.LANCZOS)
-    for i in range(2):
-        img.paste(sp, (int(w * 0.55) + i * size, ground - size), sp)
-    return img
+    W, Hh = img.size
+    e = max(4, Hh // 14)
+    d.rectangle([0, 0, W, Hh], outline=(24, 41, 143, 255), width=e)
+    d.rectangle([0, Hh - e, W, Hh], fill=(24, 41, 143, 255))
+    size = int(Hh * 0.3)
+    def put(shape, angle, x, y):
+        s = shape.rotate(angle, resample=Image.BICUBIC).resize((size, size), Image.LANCZOS)
+        img.alpha_composite(s, (int(x - size / 2), int(y - size / 2)))
+    put(ball(), 0, W * 0.22, Hh - e - size * 0.33)
+    put(triangle(), 90, W - e - size * 0.33, Hh * 0.55)
+    put(square(), 0, W * 0.62, e + size * 0.33)
+    put(diamond(), -90, e + size * 0.33, Hh * 0.38)
+    sp = spike().resize((size // 2, size // 2), Image.LANCZOS)
+    for i in range(3):
+        img.alpha_composite(sp, (int(W * 0.42) + i * size // 2, Hh - e - size // 2))
+    return img.resize((w, h), Image.LANCZOS)
 
 
 # ---- sound ----
@@ -151,7 +177,21 @@ def write_wav(path, samples):
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(RATE)
-        w.writeframes(b''.join(struct.pack('<h', max(-32767, min(32767, int(s * 32767)))) for s in samples))
+        w.writeframes(pcm(samples))
+
+
+def pcm(samples):
+    return b''.join(struct.pack('<h', max(-32767, min(32767, int(s * 32767)))) for s in samples)
+
+
+def write_mp3(path, samples):
+    enc = lameenc.Encoder()
+    enc.set_bit_rate(96)
+    enc.set_in_sample_rate(RATE)
+    enc.set_channels(1)
+    enc.set_quality(2)
+    with open(path, 'wb') as f:
+        f.write(enc.encode(pcm(samples)) + enc.flush())
 
 
 def song(bpm, chords, lead, seed):
@@ -201,14 +241,36 @@ def sfx_complete():
     return out
 
 
-SONGS = {
-    'level1': (128, [('C', 'E', 'G'), ('A', 'C', 'E'), ('F', 'A', 'C'), ('G', 'B', 'D')],
-               [0, None, 1, None, 2, 1, 3, None, 2, None, 1, None, 0, 1, 2, None], 1),
-    'level2': (140, [('A', 'C', 'E'), ('F', 'A', 'C'), ('C', 'E', 'G'), ('G', 'B', 'D')],
-               [3, 2, 1, 2, 0, None, 1, 2, 3, None, 4, 3, 2, None, 1, None], 2),
-    'level3': (150, [('D', 'F', 'A'), ('A#', 'D', 'F'), ('F', 'A', 'C'), ('C', 'E', 'G')],
-               [0, 1, 2, 3, 2, 1, 0, None, 3, 4, 5, 4, 3, None, 2, 1], 3),
-}
+def sfx_checkpoint():
+    out = []
+    for f in (freq('G', 5), freq('D', 6)):
+        n = int(RATE * 0.09)
+        out += [0.3 * (1 if (i * f / RATE) % 1 < 0.5 else -1) * math.exp(-i / (RATE * 0.08)) for i in range(n)]
+    return out
+
+
+# One loop per level, faster and darker as the levels get harder:
+# (bpm, four chords, 16-step lead over chord tones: 0-2 = root/third/fifth, 3-5 an octave up)
+I, VI, IV, V = ('C', 'E', 'G'), ('A', 'C', 'E'), ('F', 'A', 'C'), ('G', 'B', 'D')
+SONGS = [
+    (124, [I, VI, IV, V], [0, None, 1, None, 2, 1, 3, None, 2, None, 1, None, 0, 1, 2, None]),
+    (128, [IV, V, I, VI], [2, None, 3, 2, 1, None, 0, None, 1, 2, 3, None, 4, None, 3, None]),
+    (132, [VI, IV, I, V], [3, 2, 1, 2, 0, None, 1, 2, 3, None, 4, 3, 2, None, 1, None]),
+    (136, [('D', 'F#', 'A'), ('B', 'D', 'F#'), ('G', 'B', 'D'), ('A', 'C#', 'E')],
+     [0, 2, 4, 2, 1, 3, 5, 3, 0, 2, 4, 2, 1, None, 0, None]),
+    (140, [('A', 'C', 'E'), ('F', 'A', 'C'), ('C', 'E', 'G'), ('G', 'B', 'D')],
+     [3, None, 3, 4, 5, None, 4, 3, 2, None, 2, 1, 0, None, 1, 2]),
+    (144, [('E', 'G', 'B'), ('C', 'E', 'G'), ('G', 'B', 'D'), ('D', 'F#', 'A')],
+     [0, 1, 2, 3, 4, 3, 2, 1, 0, None, 2, None, 4, None, 5, None]),
+    (148, [('D', 'F', 'A'), ('A#', 'D', 'F'), ('F', 'A', 'C'), ('C', 'E', 'G')],
+     [0, 1, 2, 3, 2, 1, 0, None, 3, 4, 5, 4, 3, None, 2, 1]),
+    (152, [('B', 'D', 'F#'), ('G', 'B', 'D'), ('D', 'F#', 'A'), ('A', 'C#', 'E')],
+     [5, 4, 3, 4, 5, None, 3, None, 2, 1, 0, 1, 2, None, 4, None]),
+    (156, [('F', 'G#', 'C'), ('C#', 'F', 'G#'), ('G#', 'C', 'D#'), ('D#', 'G', 'A#')],
+     [0, 3, 1, 4, 2, 5, 1, 4, 0, 3, 2, None, 5, 4, 3, None]),
+    (160, [('C', 'D#', 'G'), ('G#', 'C', 'D#'), ('D#', 'G', 'A#'), ('A#', 'D', 'F')],
+     [0, 2, 3, 5, 3, 2, 0, 2, 1, 3, 4, 3, 1, None, 5, None]),
+]
 
 
 def main():
@@ -222,25 +284,26 @@ def main():
                 shutil.copy(os.path.join(SRC, sub, f), os.path.join(STAGE, sub))
 
     img = lambda name: os.path.join(STAGE, 'images', name)
-    strip(cube_frames()).save(img('cube.png'))
-    strip(ship_frames()).save(img('ship.png'))
-    spike().save(img('spike.png'))
-    spike(flip=True).save(img('spike_down.png'))
+    sheet(ball_frames(), 18).save(img('ball.png'))
+    sheet(stage_frames(triangle(), range(-40, 45, 5)), 17).save(img('triangle.png'))
+    sheet([turned(square(), -a) for a in range(0, 90, 5)], 18).save(img('square.png'))
+    sheet(stage_frames(diamond(), (-45, 0, 45)), 3).save(img('diamond.png'))
+    for side in range(4):
+        down(spike().rotate(90 * side)).save(img(f'spike_{side}.png'))
+        down(pad().rotate(90 * side)).save(img(f'pad_{side}.png'))
     orb().save(img('orb.png'))
-    pad().save(img('pad.png'))
-    portal((255, 106, 213)).save(img('portal_ship.png'))
-    portal((124, 255, 107)).save(img('portal_cube.png'))
     poster(290, 218).save(img('icon_hd.png'))
     poster(214, 144).save(img('icon_sd.png'))
     poster(1280, 720).save(img('splash_hd.png'))
 
     snd = lambda name: os.path.join(STAGE, 'sounds', name)
-    for name, (bpm, chords, lead, seed) in SONGS.items():
-        write_wav(snd(name + '.wav'), song(bpm, chords, lead, seed))
+    for i, (bpm, chords, lead) in enumerate(SONGS):
+        write_mp3(snd(f'level{i + 1}.mp3'), song(bpm, chords, lead, i + 1))
     write_wav(snd('die.wav'), sfx_die())
     write_wav(snd('complete.wav'), sfx_complete())
+    write_wav(snd('checkpoint.wav'), sfx_checkpoint())
 
-    out = os.path.join(DIST, 'cube-dash-roku.zip')
+    out = os.path.join(DIST, 'spiral-shift-roku.zip')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         for base, _, files in os.walk(STAGE):
             for f in sorted(files):

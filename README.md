@@ -65,9 +65,9 @@ then you stop unless an arrow is held; Play within ~12 frames of landing chains 
 the same way. Back returns to the title (exits from the title), Rew / Fwd step through
 chambers (playtest).
 
-## Cube Dash (Roku)
-A separate, original Geometry Dash–style runner for Roku lives in `dash/`; see `dash/README.md`.
+## Spiral Shift (Roku)
+A separate, original one-button runner for Roku lives in `dash/`; see `dash/README.md`.
 ```
-python3 dash/tools/build.py       # -> dist/cube-dash-roku.zip
-node dash/tools/test.mjs          # physics checks + every level beatable + compile check
+python3 dash/tools/build.py       # -> dist/spiral-shift-roku.zip
+node dash/tools/test.mjs          # physics checks + every stage solved + compile check
 ```
