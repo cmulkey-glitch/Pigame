@@ -151,6 +151,7 @@ sub Test_physics()
         r.events = []
     end for
     Check(r.stage = 1 and r.mode = "fly" and events.Count() = 1 and events[0] = "checkpoint", "end of a stage is a checkpoint into the next mode")
+    Check(r.exit.stage = 0 and r.exit.mode = "jump" and r.exit.x >= 22 and r.exit.y = 0, "the checkpoint records how the stage was left")
     Check(Abs(Run_progress(r) - (22 + r.x) / 44) < 0.001, "progress runs across stages")
     for f = 1 to 140
         Run_step(r, false)

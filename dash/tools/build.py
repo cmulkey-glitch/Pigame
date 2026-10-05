@@ -2,9 +2,10 @@
 
 Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
 generated assets:
-  images/ball, triangle, square, diamond.png   player frames, 72 px squares (main.brs)
+  images/ball, triangle, square, diamond.png   player frames, 72 px squares (main.brs);
+                                               rocket.png for the corner animation
   images/spike_N, pad_N.png                    turned for side N; orb.png; icons, splash
-  sounds/level1-10.mp3                         8-bar chiptune loops; die, complete,
+  sounds/level1-10.mp3                         8-bar chiptune loops; die, complete, rocket,
                                                checkpoint.wav
 
 Needs Pillow and lameenc (pip install pillow lameenc). Usage: python3 dash/tools/build.py
@@ -100,6 +101,23 @@ def diamond():
     d.polygon([((c - 26) * S, c * S), (c * S, (c - 17) * S), ((c + 26) * S, c * S), (c * S, (c + 17) * S)], fill=(0, 0, 0, 255))
     d.polygon([((c - 20) * S, c * S), (c * S, (c - 12) * S), ((c + 20) * S, c * S), (c * S, (c + 12) * S)], fill=DIAMOND + (255,))
     d.polygon([((c - 8) * S, c * S), (c * S, (c - 5) * S), ((c + 8) * S, c * S), (c * S, (c + 5) * S)], fill=(230, 255, 225, 255))
+    return img
+
+
+def rocket():
+    """White rocket with a red nose and fins, pointing right (the corner animation)."""
+    img = canvas(CELL, CELL)
+    d = ImageDraw.Draw(img)
+    S, c = SS, CELL // 2
+    red, white, ink = (230, 57, 70, 255), (245, 245, 250, 255), (0, 0, 0, 255)
+    # fins
+    d.polygon([((c - 20) * S, (c - 6) * S), ((c - 28) * S, (c - 17) * S), ((c - 10) * S, (c - 6) * S)], fill=red, outline=ink)
+    d.polygon([((c - 20) * S, (c + 6) * S), ((c - 28) * S, (c + 17) * S), ((c - 10) * S, (c + 6) * S)], fill=red, outline=ink)
+    # body and nose
+    d.rounded_rectangle([(c - 24) * S, (c - 9) * S, (c + 12) * S, (c + 9) * S], radius=4 * S, fill=white, outline=ink, width=2 * S)
+    d.polygon([((c + 11) * S, (c - 9) * S), ((c + 28) * S, c * S), ((c + 11) * S, (c + 9) * S)], fill=red, outline=ink)
+    # window
+    d.ellipse([(c - 2) * S, (c - 5) * S, (c + 8) * S, (c + 5) * S], fill=(77, 214, 255, 255), outline=ink, width=S)
     return img
 
 
@@ -241,6 +259,19 @@ def sfx_complete():
     return out
 
 
+def sfx_rocket():
+    """A whoosh: noise through a rising, then fading, filter."""
+    rng = random.Random(11)
+    n = int(RATE * 0.6)
+    out, lp = [], 0.0
+    for i in range(n):
+        t = i / n
+        cut = 0.02 + 0.3 * t
+        lp += cut * (rng.uniform(-1, 1) - lp)
+        out.append(lp * 2.2 * min(1, t * 8) * (1 - t) ** 1.5)
+    return out
+
+
 def sfx_checkpoint():
     out = []
     for f in (freq('G', 5), freq('D', 6)):
@@ -288,6 +319,7 @@ def main():
     sheet(stage_frames(triangle(), range(-40, 45, 5)), 17).save(img('triangle.png'))
     sheet([turned(square(), -a) for a in range(0, 90, 5)], 18).save(img('square.png'))
     sheet(stage_frames(diamond(), (-45, 0, 45)), 3).save(img('diamond.png'))
+    sheet(stage_frames(rocket(), (0,)), 4).save(img('rocket.png'))
     for side in range(4):
         down(spike().rotate(90 * side)).save(img(f'spike_{side}.png'))
         down(pad().rotate(90 * side)).save(img(f'pad_{side}.png'))
@@ -302,6 +334,7 @@ def main():
     write_wav(snd('die.wav'), sfx_die())
     write_wav(snd('complete.wav'), sfx_complete())
     write_wav(snd('checkpoint.wav'), sfx_checkpoint())
+    write_wav(snd('rocket.wav'), sfx_rocket())
 
     out = os.path.join(DIST, 'spiral-shift-roku.zip')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
