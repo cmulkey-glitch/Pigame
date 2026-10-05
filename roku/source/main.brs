@@ -21,7 +21,7 @@ sub Main()
     }
     game = Game_new({ rooms: data.rooms.rooms, title: data.rooms.title
                       doorOpenInitial: data.rooms.doorOpenInitial, sounds: data.sounds.sounds
-                      physics: data.rooms.physics })
+                      physics: data.rooms.physics, rules: data.rooms.rules })
     reg = CreateObject("roRegistrySection", "downland")
     if reg.Exists("hi") then game.hiScore = reg.Read("hi").ToInt()
     savedHi = game.hiScore

@@ -627,6 +627,18 @@ function wire() {
       status(ok ? 'Copied the level pack. Paste it into a file named levels.json.' : 'Copying was blocked; use Export instead.', !ok);
     }
   });
+  confirmClick($('starter'), 'Click again to replace your edits', async () => {
+    stopPlay();
+    try {
+      const pack = await platform.loadJSON('levels/starter.json');
+      pack.physics = physicsFrom(pack.physics);
+      ed.pack = pack; ed.cur = 0; ed.playStart = null;
+      changed(); renderChamberSelect();
+      status(`Loaded ${pack.name}: ${pack.rooms.length} chambers.`);
+    } catch (err) {
+      status(`Couldn't load the starter caves: ${err.message}`, true);
+    }
+  });
   $('export').addEventListener('click', () => {
     updateArrivals();
     const blob = new Blob([JSON.stringify(ed.pack)], { type: 'application/json' });

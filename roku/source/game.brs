@@ -1,6 +1,6 @@
 ' Game controller: title screen, play, game over and the escape ending (BrightScript version
 ' of src/game/game.js, minus drawing). main.brs feeds it input and draws its state.
-'   data:    { rooms, title, doorOpenInitial, sounds, physics (optional overrides) }
+'   data:    { rooms, title, doorOpenInitial, sounds, physics, rules (both optional overrides) }
 '   input:   AA of booleans left, right, up, down, jump
 '   actions: array of strings from the remote: "title", "prev", "next", "difficulty"
 '   m.sfx:   queue of { kind: "play", name, pitch, ch } / { kind: "stop" } for main.brs to play
@@ -8,7 +8,7 @@
 function Game_new(data as object) as object
     g = {
         defs: data.rooms, titleDef: data.title, doorOpenInitial: data.doorOpenInitial
-        physics: Physics_from(data.physics)
+        physics: Physics_from(data.physics), rules: Rules_from(data.rules)
         rng: Rng_new(), frame: 0, difficulty: 1, beginner: false, escapeMode: false
         hiScore: 0, mode: "title", sfx: []
         sound: SoundDriver_new(data.sounds)
@@ -20,6 +20,17 @@ function Game_new(data as object) as object
     }
     g.toTitle()
     return g
+end function
+
+' Chamber layout rules (see ROM_RULES in game.js): the pack's "rules" over the ROM's.
+function Rules_from(r as object) as object
+    rules = { start: { x: &h88, y: &hB7, facing: 1 }, loopFrom: 9, escape: 10 }
+    if r <> invalid then
+        for each k in r
+            rules[k] = r[k]
+        end for
+    end if
+    return rules
 end function
 
 sub Game_playSound(name as string, pitch as integer)
@@ -80,7 +91,7 @@ sub Game_startGame()
     m.state = NewGameState(m.defs, m.doorOpenInitial)
     m.timer = 4096
     m.prevRoom = -1 : m.prevTimer = 0
-    m.enterRoom(0, { x: &h88, y: &hB7, facing: 1 }, true)
+    m.enterRoom(0, m.rules.start, true)
     m.player.jumpLatch = true
 end sub
 
@@ -98,15 +109,15 @@ end sub
 
 ' Playtest chamber select: fresh timer, player at the chamber's start.
 sub Game_jumpToRoom(index as integer)
-    if index = 10 then m.timer = 9999 else m.timer = 4096
+    if index = m.rules.escape then m.timer = 9999 else m.timer = 4096
     m.prevRoom = -1
     m.enterRoom(index, m.startSpawn(index), false)
 end sub
 
 function Game_startSpawn(index as integer) as object
-    if index = 0 then return { x: &h88, y: &hB7, facing: 1 }
-    if index = 10 then
-        for each d in m.defs[9].doors
+    if index = 0 then return m.rules.start
+    if index = m.rules.escape then
+        for each d in m.defs[m.rules.loopFrom].doors
             if d["to"] = 0 then return { x: &h0B, y: d.arrive.y, facing: 2 }
         end for
     end if
@@ -209,7 +220,7 @@ sub Game_handle(ev as object)
     else if ev.kind = "respawn" then
         m.bird = invalid
         if m.timer = 0 then
-            if m.roomIndex = 10 then m.timer = 4096 else m.timer = 2048
+            if m.roomIndex = m.rules.escape then m.timer = 4096 else m.timer = 2048
         end if
     else if ev.kind = "gameover" then
         m.endGame("gameover")
@@ -234,18 +245,18 @@ sub Game_goThroughDoor(side as string)
     m.prevTimer = leaving
     if dest = 0 then
         if m.difficulty < 2 and not m.beginner then m.difficulty = m.difficulty + 1
-        if from = 10 then
+        if from = m.rules.escape then
             m.endGame("escaped")
             return
         end if
-        if from = 9 and m.escapeMode then
-            dest = 10
+        if from = m.rules.loopFrom and m.escapeMode and m.rules.escape >= 0 and m.rules.escape < m.defs.Count() then
+            dest = m.rules.escape
             spawn = { x: &h0B, y: spawn.y, facing: 2 }
-        else if from = 9 then
+        else if from = m.rules.loopFrom then
             m.state = NewGameState(m.defs, m.doorOpenInitial)
         end if
     end if
-    if dest = 10 then m.timer = 9999
+    if dest = m.rules.escape then m.timer = 9999
     m.enterRoom(dest, spawn, false)
 end sub
 

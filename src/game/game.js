@@ -17,7 +17,11 @@ const HUD_H = 8;
 const toPx = (x) => x * 2 - 8;
 const TITLE_GUARD = 30;        // $0147: frames before fire can start a game
 const GAME_OVER_FRAMES = 120;  // $0160
-const START = { x: 0x88, y: 0xB7, facing: FACE_LEFT };   // [$838D]
+// Chamber layout rules. A level pack can set its own in "rules"; these are the ROM's:
+// start: where a game begins in chamber 0 [$838D]; loopFrom: the chamber whose door back to
+// chamber 0 starts a new round; escape: the bonus chamber reached from loopFrom in ESCAPE
+// mode, whose exit ends the game (-1: none).
+export const ROM_RULES = Object.freeze({ start: { x: 0x88, y: 0xB7, facing: FACE_LEFT }, loopFrom: 9, escape: 10 });
 
 export class Game {
   constructor(platform) {
@@ -44,6 +48,7 @@ export class Game {
     rooms = roomData;
     this.sound = new SoundDriver(sounds.sounds);
     this.physics = physicsFrom(rooms.physics);   // live: the editor's sliders change it in play
+    this.rules = { ...ROM_RULES, ...(rooms.rules || {}) };
     this.defs = rooms.rooms;
     this.titleDef = rooms.title;
     this.doorOpenInitial = rooms.doorOpenInitial;
@@ -132,7 +137,7 @@ export class Game {
     this.timer = TIMER_FULL;
     this.prevRoom = -1;    // $0157 / $0159: chamber we came from and its timer when we left
     this.prevTimer = 0;
-    this.enterRoom(0, START, true);
+    this.enterRoom(0, this.rules.start, true);
     this.player.jumpLatch = true;   // fire started the game: release it before jumping
   }
 
@@ -152,7 +157,7 @@ export class Game {
 
   // Playtest chamber select: fresh timer, no door history, player at the chamber's start.
   jumpToRoom(index) {
-    this.timer = index === 10 ? TIMER_CHAMBER_X : TIMER_FULL;
+    this.timer = index === this.rules.escape ? TIMER_CHAMBER_X : TIMER_FULL;
     this.prevRoom = -1;
     this.enterRoom(index, this.startSpawn(index));
   }
@@ -161,9 +166,9 @@ export class Game {
   // arrival from chamber 9 ($BF9F); any other chamber is the arrival point of the door into it
   // from the lowest-numbered chamber that leads there (1 from 0, 5 from 2, 7 from 5, ...).
   startSpawn(index) {
-    if (index === 0) return START;
-    if (index === 10) {
-      const d = this.defs[9].doors.find((door) => door.to === 0);
+    if (index === 0) return this.rules.start;
+    if (index === this.rules.escape) {
+      const d = this.defs[this.rules.loopFrom].doors.find((door) => door.to === 0);
       return { x: 0x0B, y: d.arrive.y, facing: FACE_RIGHT };
     }
     for (const def of this.defs) {
@@ -206,7 +211,7 @@ export class Game {
       if (k === ']') this.jumpToRoom((this.roomIndex + 1) % n);
       else if (k === '[') this.jumpToRoom((this.roomIndex + n - 1) % n);
       else if (k >= '0' && k <= '9') this.jumpToRoom(+k);
-      else if (k === 'x' || k === 'X') this.jumpToRoom(10);
+      else if ((k === 'x' || k === 'X') && this.defs[this.rules.escape]) this.jumpToRoom(this.rules.escape);
       else if (k === 'd' || k === 'D') { this.cycleLevel(1); this.enterRoom(this.roomIndex); }
     }
     this.updatePlay();
@@ -264,7 +269,7 @@ export class Game {
     } else if (ev.type === 'respawn') {
       // [$B9B8] After a death the bird is gone; if it had come out, the timer restarts at 2048.
       this.bird = null;
-      if (this.timer === 0) this.timer = this.roomIndex === 10 ? TIMER_FULL : TIMER_AFTER_BIRD_DEATH;
+      if (this.timer === 0) this.timer = this.roomIndex === this.rules.escape ? TIMER_FULL : TIMER_AFTER_BIRD_DEATH;
     } else if (ev.type === 'gameover') {
       this.endGame('gameover');
     }
@@ -288,15 +293,16 @@ export class Game {
     if (to === 0) {
       // [$BF47] every entry into chamber 0 steps difficulty up (BEGINNER stays BEGINNER)
       if (this.difficulty < 2 && !this.beginner) this.difficulty++;
-      if (from === 10) { this.endGame('escaped'); return; }   // [$BF8B] out of chamber X: you escaped
-      if (from === 9 && this.escapeMode) {                    // [$BF9F] ESCAPE mode: on to chamber X
-        to = 10;
+      const { loopFrom, escape } = this.rules;
+      if (from === escape) { this.endGame('escaped'); return; }          // [$BF8B] out of chamber X: you escaped
+      if (from === loopFrom && this.escapeMode && this.defs[escape]) {   // [$BF9F] ESCAPE mode: on to chamber X
+        to = escape;
         spawn = { x: 0x0B, y: spawn.y, facing: FACE_RIGHT };
-      } else if (from === 9) {                                // [$BFC0] LOOPING mode: new round
+      } else if (from === loopFrom) {                                    // [$BFC0] LOOPING mode: new round
         this.state = newGameState(this.defs, this.doorOpenInitial);
       }
     }
-    if (to === 10) this.timer = TIMER_CHAMBER_X;              // [$BFD1]
+    if (to === this.rules.escape) this.timer = TIMER_CHAMBER_X;          // [$BFD1]
     this.enterRoom(to, spawn);
   }
 
