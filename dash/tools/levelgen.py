@@ -418,6 +418,14 @@ def build_stage(mode, d, length, rng):
     return out
 
 
+def stage_ok(st, mode, d):
+    if mode in ('jump', 'flip'):
+        return tap_check(st, new_state(mode), st.width + 1, round(lerp(12, 8, d))) is not None
+    # room to manoeuvre is a per-pattern rule (measured to each pattern's end); end to end
+    # the stage just has to be passable
+    return hold_check(st, [new_state(mode)], st.width + 1, 0.0, RUNWAY) is not None
+
+
 LEVELS = [
     # name, bg, ground, line
     ('Groundwork', '#2A48E8', '#18298F', '#FFFFFF'),
@@ -443,7 +451,14 @@ def make_level(i):
     widths = []
     for s, mode in enumerate(MODES):
         length = round(lerp(110, 170, d)) - (20 if mode in ('fly', 'wave') else 0)
-        st = build_stage(mode, d, length, rng)
+        # the patterns were checked one at a time; check the whole stage end to end too
+        # (the greedy path can differ) and rebuild it if it fails
+        for _ in range(20):
+            st = build_stage(mode, d, length, rng)
+            if stage_ok(st, mode, d):
+                break
+        else:
+            raise RuntimeError(f'level {i + 1} stage {s + 1}: no fair layout found')
         widths.append(st.width)
         text.append(f'--- stage {s + 1}: {mode}')
         text += st.rows()
