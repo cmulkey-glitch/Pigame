@@ -30,9 +30,10 @@ function Dash_phys() as object
         orb: 0.36
         maxFall: 0.5
         spin: 7.0           ' degrees per frame in the air: half a turn per jump
-        flyAcc: 0.018       ' triangle: holding accelerates inward, releasing outward
-        flyMax: 0.2
-        flipKick: 0.1       ' square: starting speed toward the new floor after a flip
+        flyAcc: 0.012       ' triangle: holding accelerates inward, releasing outward
+        flyMax: 0.15
+        flipG: 0.04         ' square: its own, stronger gravity, so a flip crosses in ~18 frames
+        flipKick: 0.15      ' square: starting speed toward the new floor after a flip
         wave: 10.4 / 60     ' diamond: 45 degrees
         snap: 0.25          ' how far into a block top (or underside) still counts as landing
         buffer: 10          ' a press counts for this many frames (orbs, landing); TVs lag
@@ -191,7 +192,7 @@ sub Run_step(r as object, held as boolean)
             r.buffer = 0
             r.events.Push("flip")
         end if
-        r.vy = r.vy - p.g * r.grav
+        r.vy = r.vy - p.flipG * r.grav
         if r.vy < -p.maxFall then r.vy = -p.maxFall
         if r.vy > p.maxFall then r.vy = p.maxFall
     else

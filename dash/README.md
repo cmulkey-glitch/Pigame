@@ -38,9 +38,13 @@ Enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, R
 `python3 dash/tools/levelgen.py` writes `roku/levels/1.txt` .. `10.txt`. Each stage is built
 from obstacle patterns, and a pattern is only kept if it is fair from where the previous one
 left the player: for tap stages (ball, square) every timing window must be at least 12 frames
-(200 ms) on level 1, down to 8 on level 10, and the square, which has time to spare, gets
-layouts whose tightest window is near 18 frames on level 1 down to 10; for hold stages (triangle, diamond) the paths that
-get through must leave at least 1.5 blocks of room on level 1, down to 0.75. The generator has
+(200 ms) on level 1, down to 8 on level 10. The square has time to spare, so most of its
+hazards are on the side it is on (each needs a flip) and it gets staggered spike-tipped walls
+it must cross between; of several layouts tried, the one whose tightest window is nearest 14
+frames on level 1 (8 on level 10) is kept. For hold stages (triangle, diamond) the paths that
+get through must leave room to be off the ideal line: 2 blocks on level 1 down to 1 for the
+triangle, 1.5 down to 0.75 for the diamond. Each stage is then checked again from start to end
+and rebuilt if it fails. The generator has
 a Python copy of the physics for speed; the BrightScript code is the authority (below).
 
 Level files are plain text and can be edited by hand: header lines, then four `---` stages,

@@ -6,10 +6,12 @@ fairly from where the previous pattern left the player:
   jump / flip (tap modes): a greedy player taps in the middle of each timing window; every
     window must be at least min_window frames (12 on level 1 down to 8 on level 10). The
     square has time to spare, so for it the layout whose tightest window is closest to a
-    target (18 frames on level 1 down to 10) is kept, out of several tried.
+    target (14 frames on level 1 down to 8) is kept, out of several tried; most square
+    patterns put their hazard on the side the square is on, so each needs a flip.
   fly / wave (hold modes): a search over hold / release keeps every surviving state; the
     states that also make it through the pattern must span at least min_slack blocks of
-    height at every frame (how much room there is to be off the ideal line).
+    height at every frame (how much room there is to be off the ideal line): 2 blocks on
+    level 1 down to 1 for the triangle, 1.5 down to 0.75 for the diamond.
 Patterns that fail are swapped for another; the seed makes the output repeatable.
 
 The physics here is a Python copy of Run_step, used for design only (float64 vs the device's
@@ -27,7 +29,7 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'roku', 'le
 H = 10
 MODES = ['jump', 'fly', 'flip', 'wave']
 P = dict(speed=10.4 / 60, g=0.028, jump=0.36, pad=0.457, orb=0.36, maxFall=0.5, spin=7.0,
-         flyAcc=0.018, flyMax=0.2, flipKick=0.1, wave=10.4 / 60, snap=0.25, buffer=10)
+         flyAcc=0.012, flyMax=0.15, flipG=0.04, flipKick=0.15, wave=10.4 / 60, snap=0.25, buffer=10)
 
 
 # ---- physics (mirror of game.brs Run_step, one stage) ----
@@ -85,7 +87,7 @@ def step(r, st, held):
     elif mode == 'flip':
         if r['gr'] and r['buffer'] > 0:
             r['grav'] = -r['grav']; r['vy'] = -r['grav'] * p['flipKick']; r['gr'] = False; r['buffer'] = 0
-        r['vy'] = max(-p['maxFall'], min(p['maxFall'], r['vy'] - p['g'] * r['grav']))
+        r['vy'] = max(-p['maxFall'], min(p['maxFall'], r['vy'] - p['flipG'] * r['grav']))
     else:
         r['vy'] = p['wave'] if held else -p['wave']
     py = r['y']
@@ -184,39 +186,52 @@ def tap_check(st, start, x_end, min_window):
 def hold_check(st, starts, x_end, min_slack, x_from):
     """Search every hold / release path from the states `starts` to x_end, merging states per
     half-block band (keeping the fastest rising and falling). Returns (end states, smallest
-    slack) or None if no path, or if at some frame from x_from on the paths that get through
-    span less than min_slack blocks of height."""
-    frames = [[(s, None) for s in starts]]
+    slack) or None if no path, or if at some frame from x_from on the states that still have
+    a way through span less than min_slack blocks of height."""
+    def key(t):
+        return (math.floor(t['y'] * 2), t['grav'])
+    frames = [list(starts)]
     while True:
         cur = frames[-1]
-        if all(s['x'] >= x_end for s, _ in cur):
+        if all(s['x'] >= x_end for s in cur):
             break
         lo, hi = {}, {}
-        for i, (s, _) in enumerate(cur):
+        for s in cur:
             for a in (False, True):
                 t = dict(s)
                 step(t, st, a)
                 if t['dead']:
                     continue
-                k = (math.floor(t['y'] * 2), t['grav'])
+                k = key(t)
                 # ties (the diamond's speed is constant) go to the lowest / highest
-                if k not in lo or (t['vy'], t['y']) < (lo[k][0]['vy'], lo[k][0]['y']): lo[k] = (t, i)
-                if k not in hi or (t['vy'], t['y']) > (hi[k][0]['vy'], hi[k][0]['y']): hi[k] = (t, i)
-        nxt = list({id(v[0]): v for v in list(lo.values()) + list(hi.values())}.values())
+                if k not in lo or (t['vy'], t['y']) < (lo[k]['vy'], lo[k]['y']): lo[k] = t
+                if k not in hi or (t['vy'], t['y']) > (hi[k]['vy'], hi[k]['y']): hi[k] = t
+        nxt = list({id(v): v for v in list(lo.values()) + list(hi.values())}.values())
         if not nxt:
             return None
         frames.append(nxt)
-    # walk back: which states lead to a survivor at the end
-    good = set(range(len(frames[-1])))
+    # walk back: a state still has a way through if pressing or not takes it into a band that
+    # has one next frame (bands, not the one merged parent, so no path is lost)
+    good_keys = {key(s) for s in frames[-1]}
     smallest = 99.0
-    for f in range(len(frames) - 1, 0, -1):
-        if frames[f][0][0]['x'] >= x_from:
-            ys = [frames[f][i][0]['y'] for i in good]
+    for f in range(len(frames) - 2, -1, -1):
+        good = []
+        for s in frames[f]:
+            for a in (False, True):
+                t = dict(s)
+                step(t, st, a)
+                if not t['dead'] and key(t) in good_keys:
+                    good.append(s)
+                    break
+        if not good:
+            return None
+        if frames[f][0]['x'] >= x_from:
+            ys = [s['y'] for s in good]
             smallest = min(smallest, max(ys) - min(ys))
-        good = {frames[f][i][1] for i in good}
+        good_keys = {key(s) for s in good}
     if smallest < min_slack:
         return None
-    return [s for s, _ in frames[-1]], smallest
+    return frames[-1], smallest
 
 
 # ---- patterns ----
@@ -257,7 +272,7 @@ def jump_patterns(d, rng):
 
 
 def fly_patterns(d, rng):
-    gap = 5 if d < 0.4 else 4 if d < 0.75 else 3
+    gap = 6 if d < 0.4 else 5 if d < 0.75 else 4
     def gate():
         a = rng.randint(1, H - gap - 1)
         return blocks(0, 0, 1, a) + blocks(0, a + gap, 1, H - a - gap), 1
@@ -270,12 +285,23 @@ def fly_patterns(d, rng):
         lambda: (blocks(0, H - (h := rng.randint(3, 6)), 1, h), 1),
         gate,
     ]
-    if d >= 0.3:
+    if d >= 0.4:
         pats.append(tunnel)
     return pats
 
 
-def flip_patterns(d, rng):
+def flip_patterns(d, rng, top=False):
+    """top: the square is on the ceiling now. Most patterns put their hazard on the side the
+    square is on, so each one needs a flip."""
+    edge, ceil = (H - 1, 'v'), (0, '^')     # (row, spike) of the side you are on / the other
+    if not top:
+        edge, ceil = ceil, edge
+    def run(side):
+        w = n()
+        return blocks(0, side[0], w, 1, side[1]), w
+    def wall(side):
+        h, w = rng.randint(2, 4), rng.randint(1, 3)
+        return blocks(0, 0 if side[0] == 0 else H - h, w, h), w
     def n(): return rng.randint(3, 5 + int(d * 5))
     def midwall():
         # a wall across the middle: you must not be crossing when you pass it
@@ -286,32 +312,49 @@ def flip_patterns(d, rng):
         w = rng.randint(6, 9 + int(d * 4))
         return blocks(0, 4, w + 2) + blocks(1, 0, w, 1, '^') + blocks(1, H - 1, w, 1, 'v'), w + 2
     def alt():
-        a, gap = n(), rng.randint(4, 6)
-        return blocks(0, 0, a, 1, '^') + blocks(a + gap, H - 1, a, 1, 'v'), 2 * a + gap
+        a, gap = n(), rng.randint(3, 5)
+        return blocks(0, edge[0], a, 1, edge[1]) + blocks(a + gap, ceil[0], a, 1, ceil[1]), 2 * a + gap
     def zigzag():
         # quick alternating runs: flip, flip, flip
-        a, gap = rng.randint(3, 4), rng.randint(3, 4)
+        a, gap = rng.randint(2, 4), rng.randint(2, 4)
         cells = []
         for i in range(3):
-            cells += blocks(i * (a + gap), 0 if i % 2 == 0 else H - 1, a, 1, '^' if i % 2 == 0 else 'v')
+            side = edge if i % 2 == 0 else ceil
+            cells += blocks(i * (a + gap), side[0], a, 1, side[1])
         return cells, 3 * a + 2 * gap
     def wall_then_spikes():
         # cross only after the wall, and right away
         a = rng.randint(2, 3)
-        floor = rng.random() < 0.5
-        spikes = blocks(2, 0, n(), 1, '^') if floor else blocks(2, H - 1, n(), 1, 'v')
-        return blocks(0, a, 1, H - 2 * a) + spikes, 2 + max(c for _, c, _ in spikes) - 1
+        gap = rng.randint(round(lerp(4, 2, d)), round(lerp(5, 3, d)))
+        spikes = blocks(gap, edge[0], n(), 1, edge[1])
+        return blocks(0, a, 1, H - 2 * a) + spikes, max(c for _, c, _ in spikes) + 1
+    def staggered():
+        # tall walls on alternate sides: flip only once past one, and be across before the
+        # next. Each block of spacing is ~6 frames of window: ~27 at 6 blocks, ~15 at 4
+        cells, c = [], 0
+        side = ceil                     # the first wall is on the far side: no flip yet
+        for i in range(rng.randint(3, 4)):
+            h = rng.randint(4, 5)
+            if side[0] == 0:            # spike-tipped, so it can't be landed on
+                cells += blocks(c, 0, 1, h) + [('^', c, h)]
+            else:
+                cells += blocks(c, H - h, 1, h) + [('v', c, H - h - 1)]
+            side = edge if side is ceil else ceil
+            c += rng.randint(round(lerp(6, 4, d)), round(lerp(7, 4, d)))
+        return cells, c - 4
     pats = [
-        lambda: (blocks(0, 0, w := n(), 1, '^'), w),
-        lambda: (blocks(0, H - 1, w := n(), 1, 'v'), w),
-        lambda: (blocks(0, 0, w := rng.randint(1, 3), rng.randint(2, 4)), w),
-        lambda: (blocks(0, H - (h := rng.randint(2, 4)), w := rng.randint(1, 3), h), w),
+        lambda: run(edge),
+        lambda: wall(edge),
         midwall,
+        staggered,
+        staggered,
+        staggered,
+        wall_then_spikes,
     ]
     if d >= 0.2:
         pats += [platform, alt]
     if d >= 0.5:
-        pats += [zigzag, wall_then_spikes]
+        pats += [zigzag]
     return pats
 
 
@@ -348,12 +391,14 @@ def lerp(a, b, t):
 
 def build_stage(mode, d, length, rng):
     min_window = round(lerp(12, 8, d))
-    min_slack = lerp(1.5, 0.75, d)
+    min_slack = lerp(2.0, 1.0, d) if mode == 'fly' else lerp(1.5, 0.75, d)
     space = (round(lerp(5, 3, d)), round(lerp(9, 6, d)))     # blocks between patterns
-    if mode in ('fly', 'wave'):
+    if mode == 'fly':
+        space = (round(lerp(10, 7, d)), round(lerp(14, 10, d)))
+    if mode == 'wave':
         space = (round(lerp(7, 4, d)), round(lerp(11, 7, d)))
     if mode == 'flip':
-        space = (round(lerp(3, 2, d)), round(lerp(6, 4, d)))
+        space = (1, round(lerp(3, 2, d)))
     total = RUNWAY + length + TAIL
     st = Strip(total)
     # the triangle (and, from level 6, the diamond) flies over a floor of spikes
@@ -366,12 +411,12 @@ def build_stage(mode, d, length, rng):
     # the square has slack to spare: try several layouts and keep the one whose tightest
     # timing window is closest to target_window
     tries = 8 if mode == 'flip' else 1
-    target_window = lerp(18, 10, d)
+    target_window = lerp(14, 8, d)
     while pos < RUNWAY + length:
         found = []
         for _ in range(30):
             gap = rng.randint(*space)
-            pats = PATTERNS[mode](d, rng)
+            pats = flip_patterns(d, rng, state['grav'] == -1) if mode == 'flip' else PATTERNS[mode](d, rng)
             pick = rng.randrange(len(pats))
             if pick in recent and len(pats) > len(recent):
                 continue
@@ -389,7 +434,9 @@ def build_stage(mode, d, length, rng):
                         trial.put('^', c, 0)
             for k, c, r in cells:
                 trial.put(k, at + c, r)
-            x_end = at + w + 3
+            # hold modes: judge the room up to a little past the pattern, so the next one can
+            # not catch the player in a spot this one forced
+            x_end = at + w + (3 if tap else 6)
             res = tap_check(trial, state, x_end, min_window) if tap else hold_check(trial, state, x_end, min_slack, at - 2)
             if res is None:
                 continue
@@ -421,9 +468,10 @@ def build_stage(mode, d, length, rng):
 def stage_ok(st, mode, d):
     if mode in ('jump', 'flip'):
         return tap_check(st, new_state(mode), st.width + 1, round(lerp(12, 8, d))) is not None
-    # room to manoeuvre is a per-pattern rule (measured to each pattern's end); end to end
-    # the stage just has to be passable
-    return hold_check(st, [new_state(mode)], st.width + 1, 0.0, RUNWAY) is not None
+    # room to manoeuvre is a per-pattern rule (measured to just past each pattern); end to
+    # end, where one pattern can set up the next, at least half of it
+    slack = lerp(2.0, 1.0, d) if mode == 'fly' else lerp(1.5, 0.75, d)
+    return hold_check(st, [new_state(mode)], st.width + 1, slack / 2, RUNWAY) is not None
 
 
 LEVELS = [
@@ -453,7 +501,7 @@ def make_level(i):
         length = round(lerp(110, 170, d)) - (20 if mode in ('fly', 'wave') else 0)
         # the patterns were checked one at a time; check the whole stage end to end too
         # (the greedy path can differ) and rebuild it if it fails
-        for _ in range(20):
+        for _ in range(80):
             st = build_stage(mode, d, length, rng)
             if stage_ok(st, mode, d):
                 break

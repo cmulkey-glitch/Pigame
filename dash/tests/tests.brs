@@ -117,7 +117,7 @@ sub Test_physics()
         Run_step(r, false)
         n = n + 1
     end while
-    Check(r.grav = -1 and r.y = 9 and n < 30, "square flips to the ceiling in under 30 frames (" + n.ToStr() + ")")
+    Check(r.grav = -1 and r.y = 9 and n < 24, "square flips to the ceiling in under 24 frames (" + n.ToStr() + ")")
     r = Hold(flip, 80)
     Check(r.grav = -1 and r.y = 9, "holding flips once, not again on landing")
     floorSpikes = Mini("flip", Empty_rows(9) + "..........^^^^^^^^......................")
