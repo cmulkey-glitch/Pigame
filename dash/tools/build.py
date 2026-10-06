@@ -3,7 +3,7 @@
 Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
 generated assets:
   images/ball, triangle, square, diamond.png   player frames, 72 px squares (main.brs);
-                                               rocket.png for the corner animation
+                                               nose, fin.png: rocket parts for the corner animation
   images/spike_N, pad_N.png                    turned for side N; orb.png; icons, splash
   sounds/level1-10.mp3                         8-bar chiptune loops; die, complete, rocket,
                                                checkpoint.wav
@@ -104,20 +104,24 @@ def diamond():
     return img
 
 
-def rocket():
-    """White rocket with a red nose and fins, pointing right (the corner animation)."""
-    img = canvas(CELL, CELL)
+def nose():
+    """Red nose cone pointing right, for the corner animation's rocket (main.brs)."""
+    img = canvas(BLOCK, BLOCK)
     d = ImageDraw.Draw(img)
-    S, c = SS, CELL // 2
-    red, white, ink = (230, 57, 70, 255), (245, 245, 250, 255), (0, 0, 0, 255)
-    # fins
-    d.polygon([((c - 20) * S, (c - 6) * S), ((c - 28) * S, (c - 17) * S), ((c - 10) * S, (c - 6) * S)], fill=red, outline=ink)
-    d.polygon([((c - 20) * S, (c + 6) * S), ((c - 28) * S, (c + 17) * S), ((c - 10) * S, (c + 6) * S)], fill=red, outline=ink)
-    # body and nose
-    d.rounded_rectangle([(c - 24) * S, (c - 9) * S, (c + 12) * S, (c + 9) * S], radius=4 * S, fill=white, outline=ink, width=2 * S)
-    d.polygon([((c + 11) * S, (c - 9) * S), ((c + 28) * S, c * S), ((c + 11) * S, (c + 9) * S)], fill=red, outline=ink)
-    # window
-    d.ellipse([(c - 2) * S, (c - 5) * S, (c + 8) * S, (c + 5) * S], fill=(77, 214, 255, 255), outline=ink, width=S)
+    S = SS
+    d.polygon([(6 * S, 8 * S), (44 * S, 24 * S), (6 * S, 40 * S)], fill=(0, 0, 0, 255))
+    d.polygon([(9 * S, 13 * S), (38 * S, 24 * S), (9 * S, 35 * S)], fill=(230, 57, 70, 255))
+    d.rectangle([4 * S, 8 * S, 9 * S, 40 * S], fill=(245, 245, 250, 255), outline=(0, 0, 0, 255), width=S)
+    return img
+
+
+def fin():
+    """The rocket's upper fin (rocket pointing right): swept back and up."""
+    img = canvas(BLOCK, BLOCK)
+    d = ImageDraw.Draw(img)
+    S = SS
+    d.polygon([(10 * S, 40 * S), (4 * S, 6 * S), (40 * S, 40 * S)], fill=(0, 0, 0, 255))
+    d.polygon([(13 * S, 37 * S), (9 * S, 14 * S), (33 * S, 37 * S)], fill=(230, 57, 70, 255))
     return img
 
 
@@ -319,7 +323,14 @@ def main():
     sheet(stage_frames(triangle(), range(-40, 45, 5)), 17).save(img('triangle.png'))
     sheet([turned(square(), -a) for a in range(0, 90, 5)], 18).save(img('square.png'))
     sheet(stage_frames(diamond(), (-45, 0, 45)), 3).save(img('diamond.png'))
-    sheet(stage_frames(rocket(), (0,)), 4).save(img('rocket.png'))
+    parts = Image.new('RGBA', (BLOCK * 4, BLOCK), (0, 0, 0, 0))
+    fins = Image.new('RGBA', (BLOCK * 4, BLOCK * 2), (0, 0, 0, 0))
+    for side in range(4):
+        parts.paste(down(nose().rotate(90 * side)), (BLOCK * side, 0))
+        fins.paste(down(fin().rotate(90 * side)), (BLOCK * side, 0))
+        fins.paste(down(fin().transpose(Image.FLIP_TOP_BOTTOM).rotate(90 * side)), (BLOCK * side, BLOCK))
+    parts.save(img('nose.png'))
+    fins.save(img('fin.png'))
     for side in range(4):
         down(spike().rotate(90 * side)).save(img(f'spike_{side}.png'))
         down(pad().rotate(90 * side)).save(img(f'pad_{side}.png'))

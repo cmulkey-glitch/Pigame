@@ -4,7 +4,9 @@ Each level is four stages (jump, fly, flip, wave; see dash/roku/source/game.brs)
 built left to right from obstacle patterns. Every pattern is only kept if it can be cleared
 fairly from where the previous pattern left the player:
   jump / flip (tap modes): a greedy player taps in the middle of each timing window; every
-    window must be at least min_window frames (12 on level 1 down to 8 on level 10).
+    window must be at least min_window frames (12 on level 1 down to 8 on level 10). The
+    square has time to spare, so for it the layout whose tightest window is closest to a
+    target (18 frames on level 1 down to 10) is kept, out of several tried.
   fly / wave (hold modes): a search over hold / release keeps every surviving state; the
     states that also make it through the pattern must span at least min_slack blocks of
     height at every frame (how much room there is to be off the ideal line).
@@ -275,17 +277,41 @@ def fly_patterns(d, rng):
 
 def flip_patterns(d, rng):
     def n(): return rng.randint(3, 5 + int(d * 5))
+    def midwall():
+        # a wall across the middle: you must not be crossing when you pass it
+        a = rng.randint(2, 3)
+        return blocks(0, a, 1, H - 2 * a), 1
+    def platform():
+        # spikes on both sides: ride on top of (or under) a floating platform
+        w = rng.randint(6, 9 + int(d * 4))
+        return blocks(0, 4, w + 2) + blocks(1, 0, w, 1, '^') + blocks(1, H - 1, w, 1, 'v'), w + 2
+    def alt():
+        a, gap = n(), rng.randint(4, 6)
+        return blocks(0, 0, a, 1, '^') + blocks(a + gap, H - 1, a, 1, 'v'), 2 * a + gap
+    def zigzag():
+        # quick alternating runs: flip, flip, flip
+        a, gap = rng.randint(3, 4), rng.randint(3, 4)
+        cells = []
+        for i in range(3):
+            cells += blocks(i * (a + gap), 0 if i % 2 == 0 else H - 1, a, 1, '^' if i % 2 == 0 else 'v')
+        return cells, 3 * a + 2 * gap
+    def wall_then_spikes():
+        # cross only after the wall, and right away
+        a = rng.randint(2, 3)
+        floor = rng.random() < 0.5
+        spikes = blocks(2, 0, n(), 1, '^') if floor else blocks(2, H - 1, n(), 1, 'v')
+        return blocks(0, a, 1, H - 2 * a) + spikes, 2 + max(c for _, c, _ in spikes) - 1
     pats = [
         lambda: (blocks(0, 0, w := n(), 1, '^'), w),
         lambda: (blocks(0, H - 1, w := n(), 1, 'v'), w),
         lambda: (blocks(0, 0, w := rng.randint(1, 3), rng.randint(2, 4)), w),
         lambda: (blocks(0, H - (h := rng.randint(2, 4)), w := rng.randint(1, 3), h), w),
+        midwall,
     ]
-    if d >= 0.4:
-        def alt():
-            a, gap = n(), rng.randint(5, 7)
-            return blocks(0, 0, a, 1, '^') + blocks(a + gap, H - 1, a, 1, 'v'), 2 * a + gap
-        pats.append(alt)
+    if d >= 0.2:
+        pats += [platform, alt]
+    if d >= 0.5:
+        pats += [zigzag, wall_then_spikes]
     return pats
 
 
@@ -326,6 +352,8 @@ def build_stage(mode, d, length, rng):
     space = (round(lerp(5, 3, d)), round(lerp(9, 6, d)))     # blocks between patterns
     if mode in ('fly', 'wave'):
         space = (round(lerp(7, 4, d)), round(lerp(11, 7, d)))
+    if mode == 'flip':
+        space = (round(lerp(3, 2, d)), round(lerp(6, 4, d)))
     total = RUNWAY + length + TAIL
     st = Strip(total)
     # the triangle (and, from level 6, the diamond) flies over a floor of spikes
@@ -335,10 +363,14 @@ def build_stage(mode, d, length, rng):
     pos = RUNWAY
     first = True
     recent = []
+    # the square has slack to spare: try several layouts and keep the one whose tightest
+    # timing window is closest to target_window
+    tries = 8 if mode == 'flip' else 1
+    target_window = lerp(18, 10, d)
     while pos < RUNWAY + length:
-        gap = rng.randint(*space)
-        placed = False
+        found = []
         for _ in range(30):
+            gap = rng.randint(*space)
             pats = PATTERNS[mode](d, rng)
             pick = rng.randrange(len(pats))
             if pick in recent and len(pats) > len(recent):
@@ -361,10 +393,14 @@ def build_stage(mode, d, length, rng):
             res = tap_check(trial, state, x_end, min_window) if tap else hold_check(trial, state, x_end, min_slack, at - 2)
             if res is None:
                 continue
-            st, state, pos, placed, first = trial, res[0], at + w, True, False
+            found.append((abs(res[1] - target_window), trial, res[0], at + w, pick))
+            if len(found) >= tries:
+                break
+        if found:
+            _, st, state, pos, pick = min(found, key=lambda f: f[0])
+            first = False
             recent = (recent + [pick])[-2:]   # not the same pattern within three
-            break
-        if not placed:
+        else:
             pos += 3
             if floor_spikes:
                 # keep the floor dangerous across the skipped columns too, if still passable

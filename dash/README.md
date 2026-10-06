@@ -11,8 +11,9 @@ in four stages, and each stage is a different shape with its own mechanic:
 | 4 | left | downward | diamond | hold to cut diagonally inward, release to cut back |
 
 Gravity always pulls toward the edge being run along. Each corner is a checkpoint: the camera
-stops, the shape runs into the screen corner, turns into a rocket that flies up the next side
-and becomes the next shape. A crash sends you back to the start of the current stage. Yellow orbs (press while touching) and jump
+stops, the shape runs into the screen corner and a rocket is built around it (nose cone and
+fins fly in), which blasts up the next side; on the way the shape inside turns into the next
+one, and the rocket parts blow off at the start. A crash sends you back to the start of the current stage. Yellow orbs (press while touching) and jump
 pads appear in ball stages. Ten levels, Easy to Insane; best % per level is saved on the
 device.
 
@@ -37,7 +38,8 @@ Enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, R
 `python3 dash/tools/levelgen.py` writes `roku/levels/1.txt` .. `10.txt`. Each stage is built
 from obstacle patterns, and a pattern is only kept if it is fair from where the previous one
 left the player: for tap stages (ball, square) every timing window must be at least 12 frames
-(200 ms) on level 1, down to 8 on level 10; for hold stages (triangle, diamond) the paths that
+(200 ms) on level 1, down to 8 on level 10, and the square, which has time to spare, gets
+layouts whose tightest window is near 18 frames on level 1 down to 10; for hold stages (triangle, diamond) the paths that
 get through must leave at least 1.5 blocks of room on level 1, down to 0.75. The generator has
 a Python copy of the physics for speed; the BrightScript code is the authority (below).
 

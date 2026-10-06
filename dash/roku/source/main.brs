@@ -8,8 +8,8 @@
 ' In a strip's own frame the player runs toward +x and y = 0 is the edge (game.brs). View_rect
 ' maps a box in that frame to the screen. The camera keeps the player a fixed distance from
 ' the screen edge it runs away from, until the end of the stage comes into view; then it stops
-' and the player runs into the screen corner, where the corner animation (Trans_*) turns it
-' into a rocket that flies up the next side and becomes the next shape.
+' and the player runs into the screen corner, where the corner animation (Trans_*) builds a
+' rocket around it that flies up the next side, turning it into the next shape on the way.
 '
 ' Two clocks: ticks at 60 a second drive menus, particles and animations; game steps
 ' (Run_step) run at 60 a second too, or slower in Kids mode (KIDS_SPEED), which slows the whole
@@ -107,9 +107,12 @@ function App_new(screen as object) as object
         end for
     end for
     app.sheets = {}
-    for each name in ["ball", "triangle", "square", "diamond", "rocket"]
+    for each name in ["ball", "triangle", "square", "diamond"]
         app.sheets[name] = Sheet(CreateObject("roBitmap", "pkg:/images/" + name + ".png"), 72)
     end for
+    ' rocket parts for the corner animation, one per side (fins: one side's row, then the other)
+    app.sheets.nose = Sheet(CreateObject("roBitmap", "pkg:/images/nose.png"), 48)
+    app.sheets.fin = Sheet(CreateObject("roBitmap", "pkg:/images/fin.png"), 48)
     return app
 end function
 
@@ -293,10 +296,12 @@ sub Spark(app as object, x as float, y as float, vx as float, vy as float, size 
 end sub
 
 ' ---- the corner animation ----
-' Frames (ticks) of each phase: the old shape rolls into the corner, turns into a rocket,
-' the rocket flies up the new side to the start, and pops into the new shape.
+' The old shape rolls into the corner and becomes the body of a rocket: nose cone and fins fly
+' in and lock on, it ignites and flies up the new side, the body turns into the new shape on
+' the way (shrink, white flash, grow), and at the start the rocket parts blow off.
+' Tick at which each phase ends:
 function Trans_phases() as object
-    return { corner: 18, morph: 28, fly: 62, pop: 72 }
+    return { corner: 16, build: 34, ignite: 44, convert: 62, fly: 80, eject: 94 }
 end function
 
 sub Trans_tick(app as object)
@@ -304,36 +309,42 @@ sub Trans_tick(app as object)
     ph = Trans_phases()
     t.t = t.t + 1
     if t.t = ph.corner then
-        ' burst of sparks as the shape becomes a rocket
+        app.banner = Shape_info(t.exit.mode).name + "  >>  " + Shape_info(app.run.mode).name
+    else if t.t = ph.build then
+        ' the parts lock on
         c = Trans_corner(app)
-        color = Shape_info(t.exit.mode).color
-        for i = 1 to 18
-            a = Rnd(0) * 6.283
-            Spark(app, c.x, c.y, Cos(a) * 6, Sin(a) * 6, 6, color, 25)
+        for i = 1 to 12
+            a = i * 6.283 / 12
+            Spark(app, c.x, c.y, Cos(a) * 5, Sin(a) * 5, 5, &hFFFFFFFF, 14)
         end for
-        app.banner = "CHECKPOINT"
-    else if t.t = ph.morph then
+    else if t.t = ph.ignite then
         app.sfxRocket.Trigger(80)
-    else if t.t > ph.morph and t.t < ph.fly then
-        ' flame out of the back of the rocket
+    else if t.t = ph.convert then
+        ' the body changes: white flash ring
+        p = Trans_rocket_pos(app)
+        color = Shape_info(app.run.mode).color
+        for i = 1 to 20
+            a = i * 6.283 / 20
+            Spark(app, p.x, p.y, Cos(a) * 8, Sin(a) * 8, 7, &hFFFFFFFF, 16)
+            Spark(app, p.x, p.y, Cos(a) * 4, Sin(a) * 4, 6, color, 22)
+        end for
+    else if t.t >= ph.eject then
+        app.trans = invalid
+        app.banner = Shape_info(app.run.mode).name
+        app.pause = 30          ' a moment to see the new shape before it moves
+        app.prev = invalid
+        return
+    end if
+    ' flame out of the back of the rocket while it burns
+    if t.t > ph.build and t.t < ph.fly then
         p = Trans_rocket_pos(app)
         d = Run_dir(app.run.stage)
         flame = [&hFFE14DFF, &hFF8A2BFF, &hFF4D4DFF]
-        for i = 1 to 2
-            Spark(app, p.x - d.x * 30 + (Rnd(0) - 0.5) * 12, p.y - d.y * 30 + (Rnd(0) - 0.5) * 12, -d.x * (2 + Rnd(0) * 4) + (Rnd(0) - 0.5) * 2, -d.y * (2 + Rnd(0) * 4) + (Rnd(0) - 0.5) * 2, 5 + Rnd(6), flame[Rnd(3) - 1], 18)
+        n = 1
+        if t.t > ph.ignite then n = 3
+        for i = 1 to n
+            Spark(app, p.x - d.x * 40 + (Rnd(0) - 0.5) * 12, p.y - d.y * 40 + (Rnd(0) - 0.5) * 12, -d.x * (2 + Rnd(0) * 5) + (Rnd(0) - 0.5) * 2, -d.y * (2 + Rnd(0) * 5) + (Rnd(0) - 0.5) * 2, 5 + Rnd(7), flame[Rnd(3) - 1], 18)
         end for
-    else if t.t = ph.fly then
-        c = Player_center(app.run, 0, 0)
-        color = Shape_info(app.run.mode).color
-        for i = 1 to 16
-            a = i * 6.283 / 16
-            Spark(app, c.x, c.y, Cos(a) * 7, Sin(a) * 7, 7, color, 20)
-        end for
-        app.banner = Shape_info(app.run.mode).name
-    else if t.t >= ph.pop then
-        app.trans = invalid
-        app.pause = 30          ' a moment to see the new shape before it moves
-        app.prev = invalid
     end if
 end sub
 
@@ -357,56 +368,87 @@ function Ease(f as float) as float
     return f * f * (3 - 2 * f)
 end function
 
+' The rocket's center: in the corner (shaking while it ignites), then flying to the start.
 function Trans_rocket_pos(app as object) as object
     ph = Trans_phases()
+    t = app.trans.t
     c = Trans_corner(app)
     s = Player_center(app.run, 0, 0)
-    f = Ease((app.trans.t - ph.morph) / (ph.fly - ph.morph))
+    if t <= ph.ignite then
+        if t > ph.build then return { x: c.x + (Rnd(0) - 0.5) * 4, y: c.y + (Rnd(0) - 0.5) * 4 }
+        return c
+    end if
+    f = (t - ph.ignite) / (ph.fly - ph.ignite)
+    f = f * f * (3 - 2 * f)
     return { x: c.x + (s.x - c.x) * f, y: c.y + (s.y - c.y) * f }
 end function
 
 sub Trans_draw(app as object)
-    s = app.screen
     t = app.trans
     e = t.exit
     ph = Trans_phases()
-    if t.t < ph.morph then
+    ns = app.run.stage
+    if t.t < ph.ignite then
         ' the old stage, its camera still stopped at the end
         st = app.lv.stages[e.stage]
-        camX = Cam_clamp(e.stage, st.width, st.width)
-        Draw_stage(app, e.stage, st, e.mode, camX)
-        ex = View_rect(e.stage, e.x, e.y, 1, 1, camX)
-        c = Trans_corner(app)
-        if t.t < ph.corner then
-            ' roll into the corner
-            f = Ease(t.t / ph.corner)
-            x = ex.x + 24 + (c.x - ex.x - 24) * f
-            y = ex.y + 24 + (c.y - ex.y - 24) * f
-            Draw_shape(app, e.mode, e.stage, e.angle + t.t * 20, x, y, 1.0)
-        else
-            ' shrink the shape while the rocket grows in its place
-            f = (t.t - ph.corner) / (ph.morph - ph.corner)
-            Draw_shape(app, e.mode, e.stage, e.angle, c.x, c.y, 1 - f)
-            Draw_rocket(app, (e.stage + 1) mod 4, c.x, c.y, f)
-        end if
+        Draw_stage(app, e.stage, st, e.mode, Cam_clamp(e.stage, st.width, st.width))
     else
-        Draw_stage(app, app.run.stage, app.run.st, app.run.mode, Cam_x(app.run, 0))
-        if t.t < ph.fly then
-            p = Trans_rocket_pos(app)
-            Draw_rocket(app, app.run.stage, p.x, p.y, 1.0)
-        else
-            ' pop into the new shape
-            c = Player_center(app.run, 0, 0)
-            f = (t.t - ph.fly) / (ph.pop - ph.fly)
-            Draw_shape(app, app.run.mode, app.run.stage, 0, c.x, c.y, 0.3 + 0.7 * f + 0.25 * Sin(f * 3.14))
-        end if
+        Draw_stage(app, ns, app.run.st, app.run.mode, Cam_x(app.run, 0))
+    end if
+    c = Trans_corner(app)
+    if t.t < ph.corner then
+        ' roll into the corner
+        st = app.lv.stages[e.stage]
+        ex = View_rect(e.stage, e.x, e.y, 1, 1, Cam_clamp(e.stage, st.width, st.width))
+        f = Ease(t.t / ph.corner)
+        Draw_shape(app, e.mode, e.stage, e.angle + t.t * 20, ex.x + 24 + (c.x - ex.x - 24) * f, ex.y + 24 + (c.y - ex.y - 24) * f, 1.0)
+        return
+    end if
+    p = Trans_rocket_pos(app)
+    ' the body: the old shape, then (around ph.convert) the new one
+    if t.t < ph.convert - 6 then
+        Draw_shape(app, e.mode, e.stage, e.angle, p.x, p.y, 1.0)
+    else if t.t < ph.convert then
+        k = (ph.convert - t.t) / 6.0
+        Draw_shape(app, e.mode, e.stage, e.angle + (6 - (ph.convert - t.t)) * 30, p.x, p.y, k)
+    else if t.t < ph.convert + 6 then
+        k = (t.t - ph.convert) / 6.0
+        Draw_shape(app, app.run.mode, ns, (ph.convert + 6 - t.t) * 30, p.x, p.y, k)
+    else if t.t < ph.fly then
+        Draw_shape(app, app.run.mode, ns, 0, p.x, p.y, 1.0)
+    else
+        ' landed: the new shape pops as the parts blow away
+        f = (t.t - ph.fly) / (ph.eject - ph.fly)
+        Draw_shape(app, app.run.mode, ns, 0, p.x, p.y, 1.0 + 0.25 * Sin(f * 3.14))
+    end if
+    ' the rocket parts: flying in, locked on, then blown off
+    if t.t < ph.build then
+        out = 1 - Ease((t.t - ph.corner) / (ph.build - ph.corner))
+        Draw_parts(app, ns, p.x, p.y, out * 150, 1.0)
+    else if t.t < ph.fly then
+        Draw_parts(app, ns, p.x, p.y, 0, 1.0)
+    else
+        f = (t.t - ph.fly) / (ph.eject - ph.fly)
+        Draw_parts(app, ns, p.x, p.y, f * 120, 1 - f)
     end if
 end sub
 
-sub Draw_rocket(app as object, s as integer, cx as float, cy as float, k as float)
+' Nose cone ahead of the body and a fin either side behind it, pushed `out` px away from
+' their places, scaled by k. The parts face stage s's run direction.
+sub Draw_parts(app as object, s as integer, cx as float, cy as float, out as float, k as float)
     if k <= 0.05 then return
-    fr = app.sheets.rocket[s]
-    app.screen.DrawScaledObject(Int(cx - 36 * k), Int(cy - 36 * k), k, k, fr)
+    d = Run_dir(s)
+    n = { x: d.y, y: -d.x }      ' a quarter turn from the run direction
+    parts = [
+        { img: app.sheets.nose[s], x: d.x * (30 + out), y: d.y * (30 + out) }
+        { img: app.sheets.fin[s], x: -d.x * (20 + out * 0.4) + n.x * (22 + out), y: -d.y * (20 + out * 0.4) + n.y * (22 + out) }
+        { img: app.sheets.fin[4 + s], x: -d.x * (20 + out * 0.4) - n.x * (22 + out), y: -d.y * (20 + out * 0.4) - n.y * (22 + out) }
+    ]
+    for each q in parts
+        x = cx + q.x
+        y = cy + q.y
+        app.screen.DrawScaledObject(Int(x - 24 * k), Int(y - 24 * k), k, k, q.img)
+    end for
 end sub
 
 ' ---- drawing ----
