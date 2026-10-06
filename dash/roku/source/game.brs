@@ -305,9 +305,9 @@ sub Run_step(r as object, held as boolean)
     if r.dead then
         r.events.Push("die")
     else if r.x >= st.width then
+        ' how the player left the stage, for main.brs's corner and spiral animations
+        r.exit = { stage: r.stage, x: r.x, y: r.y, mode: r.mode, angle: r.angle }
         if r.stage < r.lv.stages.Count() - 1 then
-            ' how the player left the stage, for main.brs's corner animation
-            r.exit = { stage: r.stage, x: r.x, y: r.y, mode: r.mode, angle: r.angle }
             Run_enter(r, r.stage + 1)
             r.events.Push("checkpoint")
         else

@@ -156,7 +156,7 @@ sub Test_physics()
     for f = 1 to 140
         Run_step(r, false)
     end for
-    Check(r.won, "the last stage ends the level")
+    Check(r.won and r.exit.stage = 1 and r.exit.mode = "fly", "the last stage ends the level, recording how it was left")
 end sub
 
 sub Test_level(n as integer)
