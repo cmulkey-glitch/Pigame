@@ -8,6 +8,8 @@ generated assets:
   sounds/level1-10.mp3                         8-bar chiptune loops; die, complete, rocket,
                                                checkpoint.wav
 
+Also writes the store listing artwork (poster 540 x 405, splash 1920 x 1080) to dist/store/.
+
 Needs Pillow and lameenc (pip install pillow lameenc). Usage: python3 dash/tools/build.py
 Sideload: open http://<roku-ip> (developer mode) and upload the zip.
 """
@@ -20,7 +22,7 @@ import wave
 import zipfile
 
 import lameenc
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, '..', 'roku')
@@ -182,6 +184,17 @@ def poster(w, h):
     sp = spike().resize((size // 2, size // 2), Image.LANCZOS)
     for i in range(3):
         img.alpha_composite(sp, (int(W * 0.42) + i * size // 2, Hh - e - size // 2))
+    # the name, if a bold font is available (DejaVu ships with most Linux systems)
+    try:
+        font = ImageFont.truetype('DejaVuSans-Bold.ttf', int(Hh * 0.115))
+    except OSError:
+        font = None
+    if font:
+        text = 'SPIRAL SHIFT'
+        tw = d.textlength(text, font=font)
+        x, y = (W - tw) / 2, Hh * 0.40
+        d.text((x + Hh * 0.008, y + Hh * 0.008), text, font=font, fill=(0, 0, 0, 255))
+        d.text((x, y), text, font=font, fill=(255, 255, 255, 255))
     return img.resize((w, h), Image.LANCZOS)
 
 
@@ -338,6 +351,11 @@ def main():
     poster(290, 218).save(img('icon_hd.png'))
     poster(214, 144).save(img('icon_sd.png'))
     poster(1280, 720).save(img('splash_hd.png'))
+    # store listing artwork for the developer dashboard (not in the package)
+    store = os.path.join(DIST, 'store')
+    os.makedirs(store, exist_ok=True)
+    poster(540, 405).convert('RGB').save(os.path.join(store, 'poster_540x405.png'))
+    poster(1920, 1080).convert('RGB').save(os.path.join(store, 'splash_1920x1080.png'))
 
     snd = lambda name: os.path.join(STAGE, 'sounds', name)
     for i, (bpm, chords, lead) in enumerate(SONGS):

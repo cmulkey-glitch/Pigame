@@ -1,0 +1,32 @@
+# Spiral Shift: store listing text
+
+## On-device description
+
+One button, four shapes. Run, fly, flip and zig-zag around every edge of your screen, then
+spiral inward to the next level. 10 levels, checkpoints at every corner, and a Kids mode.
+
+## Online description
+
+Spiral Shift is a one-button runner that takes you around every edge of your TV.
+
+Each level is four sides of the screen, and each side changes how you play:
+- Ball (along the bottom): press to jump, hold to keep bouncing.
+- Triangle (up the right side): hold to rise, let go to fall.
+- Square (along the top): press to flip gravity between the edge and the ceiling.
+- Diamond (down the left side): hold to cut diagonally inward, let go to cut back.
+
+At every corner your shape turns into a rocket, blasts around the corner and becomes the next
+shape. That corner is also a checkpoint, so a crash only sends you back to the start of the
+side you're on.
+
+The levels nest inside each other like a spiral: you can always see the next ones waiting in
+the middle of the screen. Play any level on its own, or take on Spiral mode and zoom from ring
+to ring through all ten in one run. You can pause at any time, and a spiral run is saved when
+you quit, so you can pick it up later.
+
+- 10 levels, from Easy to Insane
+- 4 shapes, each with its own control
+- Kids mode slows the whole game down without changing the levels
+- Best score saved for every level
+- Original music and art
+- Plays with just the OK button on your Roku remote
