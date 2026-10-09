@@ -720,7 +720,7 @@ sub Draw_stage(app as object, sg as integer, st as object, mode as string, camX 
     lv = app.lv
     s.Clear(lv.bg)
     Draw_backdrop(s, sg, camX)
-    Draw_rings(app, app.sel, sg, camX)
+    Draw_rings(app, app.sel, sg, camX, st.width)
     Draw_edges(s, lv, sg, camX)
     c0 = Int(camX) - 1
     if c0 < 0 then c0 = 0
@@ -770,16 +770,11 @@ function Ring_rows() as integer
     return 11       ' a stage is 10 rows; the next ring's edge band is the 11th
 end function
 
-' How much shorter each ring inward is at each end of the screen, in blocks. (A true spiral
-' would need 11 per ring, which leaves nothing on a 16:9 screen; 3 reads as one.)
-function Ring_inset() as integer
-    return 3
-end function
-
 ' The levels after level idx on side sg, for a camera at camX, shaded so the stage in play
-' stands out. Each ring is shorter than the one outside it by Ring_inset() at both ends, where
-' its band turns inward: the corners of the spiral. Its course scrolls with the run.
-sub Draw_rings(app as object, idx as integer, sg as integer, camX as float)
+' stands out. As in a real spiral, each ring runs alongside the side in play (whose strip is
+' `width` long) but starts and ends one ring (Ring_rows) further in from each corner, where its
+' band turns inward. Its course scrolls with the run.
+sub Draw_rings(app as object, idx as integer, sg as integer, camX as float, width as integer)
     s = app.screen
     span = Run_len(sg) / 48.0
     for k = 1 to 2
@@ -788,9 +783,10 @@ sub Draw_rings(app as object, idx as integer, sg as integer, camX as float)
         lv = app.levels[j]
         st = lv.stages[sg]
         base = Ring_rows() * k
-        ' along the run, this ring covers [x0, x1] (local, for this camera)
-        x0 = camX + 1 + Ring_inset() * k
-        x1 = camX + span - 1 - Ring_inset() * k
+        ' along the run, this ring covers [x0, x1]: the side in play runs from the inside of the
+        ' previous side's band (seen at the start) to its end corner (width + 1)
+        x0 = Cam_clamp(sg, width, 0) + 1 + base
+        x1 = width + 1 - base
         if x1 <= x0 then exit for
         deep = Ring_rows() * 2
         b = View_rect(sg, x0, base - 1, x1 - x0, deep, camX)
@@ -803,9 +799,12 @@ sub Draw_rings(app as object, idx as integer, sg as integer, camX as float)
             s.DrawRect(t.x, t.y, t.w, t.h, lv.ground)
         end for
         cam = camX - base
+        ' only the columns inside the ring's course and on screen
         c0 = Int(x0 - base)
+        if c0 < Int(cam) - 1 then c0 = Int(cam) - 1
         if c0 < 0 then c0 = 0
         c1 = Int(x1 - base) - 1
+        if c1 > Int(cam + span) + 1 then c1 = Int(cam + span) + 1
         if c1 > st.width - 1 then c1 = st.width - 1
         for c = c0 to c1
             if c + base >= x0 then
