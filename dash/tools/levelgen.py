@@ -29,7 +29,7 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'roku', 'le
 H = 10
 MODES = ['jump', 'fly', 'flip', 'wave']
 P = dict(speed=10.4 / 60, g=0.028, jump=0.36, pad=0.457, orb=0.36, maxFall=0.5, spin=7.0,
-         flyAcc=0.012, flyMax=0.15, flipG=0.04, flipKick=0.15, wave=10.4 / 60, snap=0.25, buffer=10)
+         flyAcc=0.03, flyMax=0.15, flipG=0.04, flipKick=0.15, wave=10.4 / 60, snap=0.25, buffer=10)
 
 
 # ---- physics (mirror of game.brs Run_step, one stage) ----
@@ -82,8 +82,12 @@ def step(r, st, held):
             r['vy'] = p['jump']; r['gr'] = False; r['buffer'] = 0
         r['vy'] = max(r['vy'] - p['g'], -p['maxFall'])
     elif mode == 'fly':
-        r['vy'] += p['flyAcc'] if held else -p['flyAcc']
-        r['vy'] = max(-p['flyMax'], min(p['flyMax'], r['vy']))
+        # held is the steer here: 1 inward, -1 toward the edge, 0 hover
+        target = held * p['flyMax']
+        if r['vy'] < target:
+            r['vy'] = min(target, r['vy'] + p['flyAcc'])
+        elif r['vy'] > target:
+            r['vy'] = max(target, r['vy'] - p['flyAcc'])
     elif mode == 'flip':
         if r['gr'] and r['buffer'] > 0:
             r['grav'] = -r['grav']; r['vy'] = -r['grav'] * p['flipKick']; r['gr'] = False; r['buffer'] = 0
@@ -188,7 +192,11 @@ def hold_check(st, starts, x_end, min_slack, x_from):
     half-block band (keeping the fastest rising and falling). Returns (end states, smallest
     slack) or None if no path, or if at some frame from x_from on the states that still have
     a way through span less than min_slack blocks of height."""
+    acts = (-1, 0, 1) if starts[0]['mode'] == 'fly' else (False, True)
     def key(t):
+        # the triangle can hover, so its speed is part of the key, not only the extremes
+        if t['mode'] == 'fly':
+            return (math.floor(t['y'] * 2), round(t['vy'] * 34))
         return (math.floor(t['y'] * 2), t['grav'])
     frames = [list(starts)]
     while True:
@@ -197,7 +205,7 @@ def hold_check(st, starts, x_end, min_slack, x_from):
             break
         lo, hi = {}, {}
         for s in cur:
-            for a in (False, True):
+            for a in acts:
                 t = dict(s)
                 step(t, st, a)
                 if t['dead']:
@@ -217,7 +225,7 @@ def hold_check(st, starts, x_end, min_slack, x_from):
     for f in range(len(frames) - 2, -1, -1):
         good = []
         for s in frames[f]:
-            for a in (False, True):
+            for a in acts:
                 t = dict(s)
                 step(t, st, a)
                 if not t['dead'] and key(t) in good_keys:
@@ -280,13 +288,25 @@ def fly_patterns(d, rng):
         a = rng.randint(1, H - gap - 1)
         w = rng.randint(3, 6)
         return blocks(0, 0, w, a) + blocks(0, a + gap, w, H - a - gap), w
+    def slalom():
+        # gates whose openings alternate low and high: steer back and forth
+        cells, c = [], 0
+        low = rng.random() < 0.5
+        for i in range(rng.randint(3, 4)):
+            a = rng.randint(1, 2) if low else rng.randint(H - gap - 2, H - gap - 1)
+            cells += blocks(c, 0, 1, a) + blocks(c, a + gap, 1, H - a - gap)
+            low = not low
+            c += rng.randint(round(lerp(9, 5, d)), round(lerp(11, 6, d)))
+        return cells, c - 4
     pats = [
         lambda: (blocks(0, 0, 1, rng.randint(3, 6)), 1),
         lambda: (blocks(0, H - (h := rng.randint(3, 6)), 1, h), 1),
         gate,
     ]
+    if d >= 0.2:
+        pats.append(slalom)
     if d >= 0.4:
-        pats.append(tunnel)
+        pats += [tunnel, slalom]
     return pats
 
 

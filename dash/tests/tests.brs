@@ -41,6 +41,17 @@ function Play(lv as object, pressAt as object, n as integer) as object
     return r
 end function
 
+' Steer the triangle: pairs of (steer, frames).
+function Steer(lv as object, plan as object) as object
+    r = Run_new(lv)
+    for i = 0 to plan.Count() - 1 step 2
+        for f = 1 to plan[i + 1]
+            Run_step(r, false, plan[i])
+        end for
+    end for
+    return r
+end function
+
 function Hold(lv as object, n as integer) as object
     r = Run_new(lv)
     for f = 1 to n
@@ -103,10 +114,17 @@ sub Test_physics()
 
     ' triangle
     sky = Mini("fly", Empty_rows(10))
-    r = Hold(sky, 200)
-    Check(r.y = 9 and not r.dead, "triangle climbs to the ceiling and stays")
-    r = Play(sky, [], 50)
-    Check(r.y = 0 and not r.dead, "triangle sinks to the edge when released")
+    r = Steer(sky, [1, 200])
+    Check(r.y = 9 and not r.dead, "triangle steers inward to the ceiling and stays")
+    r = Steer(sky, [1, 5])
+    Check(Abs(r.vy - r.lv.phys.flyMax) < 0.001, "triangle reaches full speed in 5 frames")
+    r = Steer(sky, [1, 20, 0, 60])
+    y = r.y
+    r = Steer(sky, [1, 20, 0, 160])
+    Check(r.y = y and r.y > 2 and r.vy = 0, "triangle hovers when no arrow is held (y=" + Str(r.y) + ")")
+    r = Steer(sky, [1, 20, -1, 60])
+    Check(r.y = 0 and not r.dead, "triangle steers back to the edge")
+    Check(Hold(sky, 100).y = 0, "the OK button does not move the triangle")
 
     ' square
     flip = Mini("flip", Empty_rows(10))
@@ -177,21 +195,22 @@ sub Test_level(n as integer)
     end for
 end sub
 
-' Replay "STAGE s counts" from the solutions file: alternating release / hold frame counts.
+' Replay "STAGE s runs" from the solutions file: runs of "value:frames" (the button 0 / 1, or the
+' triangle's arrows -1 / 0 / 1).
 function Replay(lv as object, s as integer, sols as object, line as integer) as boolean
     if line >= sols.Count() then return false
     parts = sols[line].Split(" ")
     if parts.Count() < 3 or parts[0] <> "STAGE" or parts[1] <> s.ToStr() then return false
     r = Run_new(lv)
     Run_enter(r, s)
-    held = false
     for i = 2 to parts.Count() - 1
-        for f = 1 to parts[i].ToInt()
-            Run_step(r, held)
+        seg = parts[i].Split(":")
+        v = seg[0].ToInt()
+        for f = 1 to seg[1].ToInt()
+            if r.mode = "fly" then Run_step(r, false, v) else Run_step(r, v = 1)
             if r.dead then return false
             if r.won or r.stage <> s then return true
         end for
-        held = not held
     end for
     return false
 end function

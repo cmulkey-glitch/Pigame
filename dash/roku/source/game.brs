@@ -12,7 +12,8 @@
 '
 ' Each stage has its own shape and mechanic (Stage_modes):
 '   ball      jump: press to jump, hold to keep jumping as you land
-'   triangle  fly: hold to rise, release to fall
+'   triangle  fly: steer with the arrows (steer = 1 inward, -1 toward the edge); no gravity, it
+'             stays where it is when you let go
 '   square    flip: press while on a surface to flip gravity between edge and ceiling
 '   diamond   wave: hold to move diagonally inward, release to move diagonally back
 '
@@ -30,7 +31,7 @@ function Dash_phys() as object
         orb: 0.36
         maxFall: 0.5
         spin: 7.0           ' degrees per frame in the air: half a turn per jump
-        flyAcc: 0.012       ' triangle: holding accelerates inward, releasing outward
+        flyAcc: 0.03        ' triangle: speeds up to (and stops from) flyMax in 5 frames
         flyMax: 0.15
         flipG: 0.04         ' square: its own, stronger gravity, so a flip crosses in ~18 frames
         flipKick: 0.15      ' square: starting speed toward the new floor after a flip
@@ -161,9 +162,9 @@ function Run_progress(r as object) as float
 end function
 
 ' One frame. held: the button is down this frame (a tap shorter than a frame still counts as
-' held for one frame). Appends "jump", "orb", "pad", "flip", "die", "checkpoint", "win" to
-' r.events.
-sub Run_step(r as object, held as boolean)
+' held for one frame). steer: the triangle's arrows, 1 inward, -1 toward the edge, 0 neither.
+' Appends "jump", "orb", "pad", "flip", "die", "checkpoint", "win" to r.events.
+sub Run_step(r as object, held as boolean, steer = 0 as integer)
     if r.dead or r.won then return
     p = r.lv.phys
     st = r.st
@@ -181,9 +182,15 @@ sub Run_step(r as object, held as boolean)
         r.vy = r.vy - p.g
         if r.vy < -p.maxFall then r.vy = -p.maxFall
     else if mode = "fly" then
-        if held then r.vy = r.vy + p.flyAcc else r.vy = r.vy - p.flyAcc
-        if r.vy > p.flyMax then r.vy = p.flyMax
-        if r.vy < -p.flyMax then r.vy = -p.flyMax
+        ' move toward the steered speed (0 when no arrow is held: hover)
+        target = steer * p.flyMax
+        if r.vy < target then
+            r.vy = r.vy + p.flyAcc
+            if r.vy > target then r.vy = target
+        else if r.vy > target then
+            r.vy = r.vy - p.flyAcc
+            if r.vy < target then r.vy = target
+        end if
     else if mode = "flip" then
         if r.grounded and r.buffer > 0 then
             r.grav = -r.grav
@@ -294,7 +301,7 @@ sub Run_step(r as object, held as boolean)
         if r.angle >= 360 then r.angle = r.angle - 360
         if r.angle < 0 then r.angle = r.angle + 360
     else if mode = "fly" then
-        r.angle = r.vy * 200    ' nose inward while climbing
+        r.angle = r.vy * 250    ' nose turned the way it is steering
     else
         r.angle = 0
         if r.vy > 0 then r.angle = 45

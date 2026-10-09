@@ -15,11 +15,12 @@
 ' (Run_step) run at 60 a second too, or slower in Kids mode (KIDS_SPEED), which slows the whole
 ' game down without changing any path through it. Frames are drawn between game steps.
 '
-' The spiral: every level's frame is drawn once, small (Ring_render), and the next levels show
-' nested inside the one being played (Draw_inner). Spiral mode plays the levels in a row; at
-' the end of each the camera zooms into the next ring (Zoom_*), which then waits for OK.
+' The spiral: the levels after the one being played lie inward of it, one ring (Ring_rows) per
+' level, drawn full size beyond its inner ceiling (Draw_rings). Spiral mode plays the levels
+' in a row; at the end of each the view slides inward to the next (Zoom_*), which waits for OK.
 '
-' Remote: OK, Play or Up is the button (jump / fly / flip / zig-zag; see game.brs); * or Back
+' Remote: OK, Play or Up is the button (jump / flip / zig-zag; see game.brs); the arrows steer
+' the triangle (App_steer); * or Back
 ' pauses (Resume / Quit). Menu: Up / Down pick a row (level, speed, spiral run), Left / Right
 ' change it, OK starts, Back exits.
 
@@ -85,7 +86,7 @@ function App_new(screen as object) as object
         screen: screen, screenMain: screen, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, kids: false
         attempts: 0, deadTicks: 0, pause: 0, banner: "", frame: 0, parts: [], trans: invalid
         spiral: false, zoom: invalid, menuRow: 0, spiralNew: false, pauseSel: 0, resumeMode: ""
-        rings: [], snap: invalid
+        snap: invalid, snapNext: invalid, arrows: {}, arrowTaps: {}
         prev: invalid, roll: 0.0, squash: 0, wasGrounded: true
         jumpDown: false, tapped: false
         reg: CreateObject("roRegistrySection", "spiralshift")
@@ -121,15 +122,9 @@ function App_new(screen as object) as object
     app.sheets.nose = Sheet(CreateObject("roBitmap", "pkg:/images/nose.png"), 48)
     app.sheets.fin = Sheet(CreateObject("roBitmap", "pkg:/images/fin.png"), 48)
 
-    ' every level's frame, drawn once at half size for the nested spiral; the full-size
-    ' bitmap it is drawn in is kept for the spiral zoom's snapshot
+    ' the spiral transition's snapshots: the last frame of a level and the first of the next
     app.snap = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
-    for each lv in app.levels
-        Ring_render(app, lv, app.snap)
-        ring = CreateObject("roBitmap", { width: 640, height: 360, AlphaEnable: false })
-        ring.DrawScaledObject(0, 0, 0.5, 0.5, app.snap)
-        app.rings.Push(ring)
-    end for
+    app.snapNext = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
     return app
 end function
 
@@ -148,7 +143,7 @@ end function
 
 function Shape_info(mode as string) as object
     if mode = "jump" then return { name: "BALL", sheet: "ball", color: &hFFD23FFF, hint: "press to jump" }
-    if mode = "fly" then return { name: "TRIANGLE", sheet: "triangle", color: &hFF6AD5FF, hint: "hold to rise" }
+    if mode = "fly" then return { name: "TRIANGLE", sheet: "triangle", color: &hFF6AD5FF, hint: "Left / Right to steer" }
     if mode = "flip" then return { name: "SQUARE", sheet: "square", color: &h4DD6FFFF, hint: "press to flip gravity" }
     return { name: "DIAMOND", sheet: "diamond", color: &h7CFF6BFF, hint: "hold to cut inward" }
 end function
@@ -195,7 +190,12 @@ function App_key(code as integer) as boolean
     if code >= 100 then
         c = code - 100
         if c = 6 or c = 13 or c = 2 then m.jumpDown = false
+        m.arrows.Delete(c.ToStr())
         return true
+    end if
+    if code >= 2 and code <= 5 then
+        m.arrows[code.ToStr()] = true
+        m.arrowTaps[code.ToStr()] = true
     end if
     if m.mode = "menu" then
         if code = 0 then return false
@@ -359,7 +359,8 @@ sub App_step()
     held = m.jumpDown or m.tapped
     if m.tapped then r.held = false     ' a fresh press: make sure Run_step sees the edge
     m.tapped = false
-    Run_step(r, held)
+    Run_step(r, held, App_steer(m, r))
+    m.arrowTaps = {}
 
     ' the ball rolls along the ground and squashes when it lands
     m.roll = m.roll + 20
@@ -398,6 +399,22 @@ sub App_step()
     end for
     r.events = []
 end sub
+
+' The triangle's steer from the arrows: the arrow pointing inward on its side of the screen
+' (away from the edge) is 1, the one pointing back at the edge -1. A tap shorter than a game
+' step still counts for one step.
+function App_steer(app as object, r as object) as integer
+    if r.mode <> "fly" then return 0
+    inward = ["2", "4", "3", "5"]       ' Up, Left, Down, Right
+    outward = ["3", "5", "2", "4"]
+    a = inward[r.stage]
+    b = outward[r.stage]
+    goIn = app.arrows.DoesExist(a) or app.arrowTaps.DoesExist(a)
+    goOut = app.arrows.DoesExist(b) or app.arrowTaps.DoesExist(b)
+    if goIn and not goOut then return 1
+    if goOut and not goIn then return -1
+    return 0
+end function
 
 sub Spark(app as object, x as float, y as float, vx as float, vy as float, size as integer, color as integer, life as integer)
     app.parts.Push({ x: x, y: y, vx: vx, vy: vy, size: size, color: color, life: life, drag: 0.96 })
@@ -663,7 +680,7 @@ sub Draw_stage(app as object, sg as integer, st as object, mode as string, camX 
     lv = app.lv
     s.Clear(lv.bg)
     Draw_backdrop(s, sg, camX)
-    Draw_inner(app, app.sel, 1.0, &h00000060)
+    Draw_rings(app, app.sel, sg, camX)
     Draw_edges(s, lv, sg, camX)
     c0 = Int(camX) - 1
     if c0 < 0 then c0 = 0
@@ -685,8 +702,8 @@ sub Draw_stage(app as object, sg as integer, st as object, mode as string, camX 
     s.DrawRect(g.x, g.y, g.w, g.h, &h7CFF6BA0)
 end sub
 
-sub Draw_cell(app as object, s as object, lv as object, sg as integer, c as integer, o as object, camX as float)
-    b = View_rect(sg, c, o.r, 1, 1, camX)
+sub Draw_cell(app as object, s as object, lv as object, sg as integer, c as integer, o as object, camX as float, yoff = 0 as integer)
+    b = View_rect(sg, c, o.r + yoff, 1, 1, camX)
     k = o.k
     if k = "#" then
         s.DrawRect(b.x, b.y, 48, 48, lv.line)
@@ -705,105 +722,92 @@ sub Draw_cell(app as object, s as object, lv as object, sg as integer, c as inte
 end sub
 
 ' ---- the spiral ----
+' The levels after this one lie inward of it, like the turns of a spiral: beyond the inner
+' ceiling of the stage in play comes the same side of the next level, full size and scrolling
+' with the run, then the one after that, as far as the screen reaches.
 
-' Each ring is drawn this much smaller than the one around it, centred on the screen.
-function Ring_scale() as float
-    return 0.3
+function Ring_rows() as integer
+    return 11       ' a stage is 10 rows; the next ring's edge band is the 11th
 end function
 
-' A level's frame for the spiral: its four edges, each with the start of its stage (only the
-' rows near the edge, so the four sides do not overlap) and its shape at the start, drawn into
-' bmp (1280 x 720).
-sub Ring_render(app as object, lv as object, bmp as object)
-    saved = app.screen
-    app.screen = bmp
-    bmp.Clear(lv.bg)
-    bands = [[0, 672, 1280, 48], [1232, 0, 48, 720], [0, 0, 1280, 48], [0, 0, 48, 720]]
-    for i = 0 to 3
-        b = bands[i]
-        bmp.DrawRect(b[0], b[1], b[2], b[3], lv.ground)
-    end for
-    for sg = 0 to 3
+' The levels after level idx on side sg, for a camera at camX, shaded so the stage in play
+' stands out. Each ring's start is a ring further along too, as in a real spiral.
+sub Draw_rings(app as object, idx as integer, sg as integer, camX as float)
+    s = app.screen
+    span = Run_len(sg) / 48.0 + 4
+    for k = 1 to 2
+        j = idx + k
+        if j >= app.levels.Count() then exit for
+        lv = app.levels[j]
         st = lv.stages[sg]
-        camX = Cam_clamp(sg, st.width, 0)
-        e = View_rect(sg, camX - 2, -0.06, Run_len(sg) / 48 + 4, 0.06, camX)
-        bmp.DrawRect(e.x, e.y, e.w, e.h, lv.line)
-        c1 = Int(camX + Run_len(sg) / 48) + 1
+        base = Ring_rows() * k
+        b = View_rect(sg, camX - 2, base - 1, span, Ring_rows(), camX)
+        s.DrawRect(b.x, b.y, b.w, b.h, lv.bg)
+        e = View_rect(sg, camX - 2, base - 1, span, 1, camX)
+        s.DrawRect(e.x, e.y, e.w, e.h, lv.ground)
+        cam = camX - base
+        c0 = Int(cam) - 1
+        if c0 < 0 then c0 = 0
+        c1 = Int(cam + span)
         if c1 > st.width - 1 then c1 = st.width - 1
-        for c = 0 to c1
+        for c = c0 to c1
             col = st.cols[c]
             for i = 0 to col.Count() - 1
-                if col[i].r <= 3 then Draw_cell(app, bmp, lv, sg, c, col[i], camX)
+                Draw_cell(app, s, lv, sg, c, col[i], cam, base)
             end for
         end for
-        p = View_rect(sg, 0, 0, 1, 1, camX)
-        Draw_shape(app, st.mode, sg, 0, p.x + 24, p.y + 24, 1.0)
     end for
-    app.screen = saved
+    sh = View_rect(sg, camX - 2, 10, span, Ring_rows() * 2 + 2, camX)
+    s.DrawRect(sh.x, sh.y, sh.w, sh.h, &h00000070)
 end sub
 
-' The levels after level idx, nested in the middle of the screen, the first at Ring_scale() x z
-' of the screen, each next one Ring_scale() smaller again; the first is shaded by shade (an
-' overlay colour), the rest a little.
-sub Draw_inner(app as object, idx as integer, z as float, shade as integer)
-    s = app.screen
-    k = Ring_scale() * z
-    for d = 1 to 3
-        j = idx + d
-        if j >= app.rings.Count() or k < 0.02 then exit for
-        x = Int(640 - 640 * k)
-        y = Int(360 - 360 * k)
-        s.DrawScaledObject(x, y, 2 * k, 2 * k, app.rings[j])
-        if d = 1 then
-            if shade <> 0 then s.DrawRect(x, y, Int(1280 * k), Int(720 * k), shade)
-        else
-            s.DrawRect(x, y, Int(1280 * k), Int(720 * k), &h00000060)
-        end if
-        k = k * Ring_scale()
-    end for
-end sub
-
-' Spiral mode, end of a level: snapshot the last frame, then build the rocket in the corner
-' and zoom into the next ring while it flies to the ring's start. Tick at which each phase ends:
+' Spiral mode, end of a level: the shape becomes a rocket in the corner, and the view slides
+' inward (down the screen) to the next level, which the rocket flies to. Tick at which each
+' phase ends:
 function Zoom_phases() as object
-    return { build: 20, fly: 84, pop: 96 }
+    return { build: 20, slide: 80, pop: 92 }
 end function
 
+' Snapshot the last frame of this level and the first of the next.
 sub Zoom_start(app as object)
     r = app.run
     e = r.exit
     st = app.lv.stages[e.stage]
     app.screen = app.snap
     Draw_stage(app, e.stage, st, e.mode, Cam_clamp(e.stage, st.width, st.width))
+    lv = app.lv
+    sel = app.sel
+    app.sel = sel + 1
+    app.lv = app.levels[app.sel]
+    nxt = app.lv.stages[0]
+    app.screen = app.snapNext
+    Draw_stage(app, 0, nxt, nxt.mode, Cam_clamp(0, nxt.width, 0))
+    app.lv = lv
+    app.sel = sel
     app.screen = app.screenMain
-    app.zoom = { t: 0, from: app.sel, exit: e }
+    app.zoom = { t: 0, from: sel, exit: e }
     app.mode = "zoom"
     app.banner = ""
 end sub
 
-' Where the corner and the next ring's start are on screen at zoom z (z = 1: as played).
-function Zoom_points(app as object, z as float) as object
+' The rocket's corner on the old frame and the start on the new one, at slide f (0..1).
+function Zoom_points(app as object, f as float) as object
     e = app.zoom.exit
     st = app.levels[app.zoom.from].stages[e.stage]
     b = View_rect(e.stage, st.width, 0, 1, 1, Cam_clamp(e.stage, st.width, st.width))
-    corner = { x: 640 + (b.x + 24 - 640) * z, y: 360 + (b.y + 24 - 360) * z }
     nxt = app.levels[app.zoom.from + 1].stages[0]
     n = View_rect(0, 0, 0, 1, 1, Cam_clamp(0, nxt.width, 0))
-    k = Ring_scale() * z
-    start = { x: 640 + (n.x + 24 - 640) * k, y: 360 + (n.y + 24 - 360) * k }
-    return { corner: corner, start: start }
+    return { corner: { x: b.x + 24, y: b.y + 24 + 720 * f }, start: { x: n.x + 24, y: n.y + 24 - 720 * (1 - f) } }
 end function
 
-function Zoom_z(app as object) as float
+function Zoom_f(app as object) as float
     ph = Zoom_phases()
-    f = Ease((app.zoom.t - ph.build) / (ph.fly - ph.build))
-    return 1 + (1 / Ring_scale() - 1) * f
+    return Ease((app.zoom.t - ph.build) / (ph.slide - ph.build))
 end function
 
 function Zoom_rocket(app as object) as object
-    ph = Zoom_phases()
-    pts = Zoom_points(app, Zoom_z(app))
-    f = Ease((app.zoom.t - ph.build) / (ph.fly - ph.build))
+    f = Zoom_f(app)
+    pts = Zoom_points(app, f)
     return { x: pts.corner.x + (pts.start.x - pts.corner.x) * f, y: pts.corner.y + (pts.start.y - pts.corner.y) * f }
 end function
 
@@ -823,11 +827,11 @@ sub Zoom_tick(app as object)
         app.sfxRocket.Trigger(80)
         app.banner = "LEVEL " + (z.from + 2).ToStr()
     end if
-    if z.t > ph.build and z.t < ph.fly then
+    if z.t > ph.build and z.t < ph.slide then
         p = Zoom_rocket(app)
         flame = [&hFFE14DFF, &hFF8A2BFF, &hFF4D4DFF]
         for i = 1 to 3
-            Spark(app, p.x - 40 + (Rnd(0) - 0.5) * 12, p.y + (Rnd(0) - 0.5) * 12, -2 - Rnd(0) * 5, (Rnd(0) - 0.5) * 2, 5 + Rnd(7), flame[Rnd(3) - 1], 18)
+            Spark(app, p.x + (Rnd(0) - 0.5) * 12, p.y + 40 + (Rnd(0) - 0.5) * 12, (Rnd(0) - 0.5) * 2, 2 + Rnd(0) * 5, 5 + Rnd(7), flame[Rnd(3) - 1], 18)
         end for
     end if
     if z.t >= ph.pop then app.begin(z.from + 1)
@@ -837,32 +841,29 @@ sub Zoom_draw(app as object)
     s = app.screen
     z = app.zoom
     ph = Zoom_phases()
-    zz = Zoom_z(app)
+    f = Zoom_f(app)
     s.Clear(&h000000FF)
-    s.DrawScaledObject(Int(640 - 640 * zz), Int(360 - 360 * zz), zz, zz, app.snap)
-    f = Ease((z.t - ph.build) / (ph.fly - ph.build))
-    Draw_inner(app, z.from, zz, Int(&h60 * (1 - f)))
+    s.DrawObject(0, Int(720 * f), app.snap)
+    s.DrawObject(0, Int(-720 * (1 - f)), app.snapNext)
     e = z.exit
     if z.t < ph.build then
         ' the shape becomes the rocket's body as the parts fly in
-        c = Zoom_points(app, 1).corner
-        out = (1 - Ease(z.t / ph.build)) * 150
+        c = Zoom_points(app, 0).corner
         Draw_shape(app, e.mode, e.stage, e.angle, c.x, c.y, 1.0)
-        Draw_parts(app, 0, c.x, c.y, out, 1.0)
-    else if z.t < ph.fly then
+        Draw_parts(app, 1, c.x, c.y, (1 - Ease(z.t / ph.build)) * 150, 1.0)
+    else if z.t < ph.slide then
         p = Zoom_rocket(app)
-        mid = (ph.build + ph.fly) / 2
-        if z.t < mid then
+        if f < 0.5 then
             Draw_shape(app, e.mode, e.stage, e.angle, p.x, p.y, 1.0)
         else
             Draw_shape(app, "jump", 0, 0, p.x, p.y, 1.0)
         end if
-        Draw_parts(app, 0, p.x, p.y, 0, 1.0)
+        Draw_parts(app, 1, p.x, p.y, 0, 1.0)
     else
-        p = Zoom_points(app, zz).start
-        f = (z.t - ph.fly) / (ph.pop - ph.fly)
-        Draw_shape(app, "jump", 0, 0, p.x, p.y, 1.0 + 0.25 * Sin(f * 3.14))
-        Draw_parts(app, 0, p.x, p.y, f * 120, 1 - f)
+        p = Zoom_points(app, 1).start
+        k = (z.t - ph.slide) / (ph.pop - ph.slide)
+        Draw_shape(app, "jump", 0, 0, p.x, p.y, 1.0 + 0.25 * Sin(k * 3.14))
+        Draw_parts(app, 1, p.x, p.y, k * 120, 1 - k)
     end if
     for each q in app.parts
         s.DrawRect(Int(q.x), Int(q.y), q.size, q.size, q.color)
@@ -872,15 +873,13 @@ end sub
 
 ' The four edge bands; the active one is lit and its marks scroll with the run.
 sub Draw_edges(s as object, lv as object, sg as integer, camX as float)
+    ' (not the band opposite: the inner rings of the spiral are drawn there)
     bands = [[0, 672, 1280, 48], [1232, 0, 48, 720], [0, 0, 1280, 48], [0, 0, 48, 720]]
     for i = 0 to 3
-        b = bands[i]
-        s.DrawRect(b[0], b[1], b[2], b[3], lv.ground)
-    end for
-    for i = 0 to 3
-        if i <> sg then
+        if i <> (sg + 2) mod 4 then
             b = bands[i]
-            s.DrawRect(b[0], b[1], b[2], b[3], &h00000070)
+            s.DrawRect(b[0], b[1], b[2], b[3], lv.ground)
+            if i <> sg then s.DrawRect(b[0], b[1], b[2], b[3], &h00000070)
         end if
     end for
     k0 = Int(camX / 4) - 1
@@ -973,6 +972,7 @@ sub Draw_hud(app as object, r as object)
     cx = hc[0]
     cy = hc[1]
     p = Run_progress(r)
+    s.DrawRect(cx - 300, cy - 14, 600, 110, &h00000070)
     s.DrawRect(cx - 180, cy, 360, 16, &hFFFFFF50)
     ' stage boundaries on the bar
     for i = 1 to 3
@@ -1006,22 +1006,26 @@ sub Draw_center_at(s as object, text as string, cx as integer, y as integer, col
     s.DrawText(text, Int(cx - w / 2), y, color, font)
 end sub
 
-' The menu: the selected level's ring fills the screen, the levels after it nested inside;
-' three rows below: level, speed, spiral run.
+' The menu: the selected level's first side as it starts, the levels after it inward (up the
+' screen); three rows over it: level, speed, spiral run.
 sub Draw_menu(app as object)
     s = app.screen
     lv = app.levels[app.sel]
-    s.DrawScaledObject(0, 0, 2, 2, app.rings[app.sel])
-    s.DrawRect(0, 0, 1280, 720, &h00000050)
-    Draw_inner(app, app.sel, 1.0, &h00000040)
-    Draw_center_at(s, "SPIRAL SHIFT", 640, 80, &hFFFFFFFF, app.big)
+    app.lv = lv
+    st = lv.stages[0]
+    camX = Cam_clamp(0, st.width, 0)
+    Draw_stage(app, 0, st, st.mode, camX)
+    p = View_rect(0, 0, 0, 1, 1, camX)
+    Draw_shape(app, st.mode, 0, 0, p.x + 24, p.y + 24, 1.0)
+    s.DrawRect(0, 40, 1280, 110, &h00000080)
+    Draw_center_at(s, "SPIRAL SHIFT", 640, 58, &hFFFFFFFF, app.big)
 
-    s.DrawRect(200, 478, 880, 190, &h000000B0)
+    s.DrawRect(200, 226, 880, 190, &h000000B0)
     best = app.best(app.sel)
-    Menu_row(app, 0, "<   Level " + (app.sel + 1).ToStr() + ":  " + lv.name + "  (" + lv.difficulty + ")   best " + best.ToStr() + "%   >", 492)
+    Menu_row(app, 0, "<   Level " + (app.sel + 1).ToStr() + ":  " + lv.name + "  (" + lv.difficulty + ")   best " + best.ToStr() + "%   >", 240)
     speed = "Speed:   NORMAL   /   kids"
     if app.kids then speed = "Speed:   normal   /   KIDS (slower)"
-    Menu_row(app, 1, speed, 532)
+    Menu_row(app, 1, speed, 280)
     saved = app.spiralSaved()
     row3 = "Spiral run:   all levels in a row, from level 1"
     if saved > 0 then
@@ -1031,8 +1035,8 @@ sub Draw_menu(app as object)
             row3 = "Spiral run:   CONTINUE FROM LEVEL " + (saved + 1).ToStr() + "   /   new run"
         end if
     end if
-    Menu_row(app, 2, row3, 572)
-    Draw_center_at(s, "Up / Down: choose    Left / Right: change    OK: start    Back: exit", 640, 624, &hFFFFFF90, app.small)
+    Menu_row(app, 2, row3, 320)
+    Draw_center_at(s, "Up / Down: choose    Left / Right: change    OK: start    Back: exit", 640, 372, &hFFFFFF90, app.small)
 end sub
 
 sub Menu_row(app as object, row as integer, text as string, y as integer)

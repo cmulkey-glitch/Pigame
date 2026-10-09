@@ -1,6 +1,6 @@
 ' Finds a way through each stage of a level with the real game code, for dash/tools/solve.mjs.
-' Prints "STAGE <n> <counts>": frame counts of alternating release / hold, starting with
-' release. dash/tests/tests.brs replays them.
+' Prints "STAGE <n> <runs>": runs of "value:frames", the value being the button (0 / 1), or
+' for the triangle the arrows (-1 / 0 / 1). dash/tests/tests.brs replays them.
 
 ' Search over hold / release each frame. States are grouped by mode, half-block height band
 ' and the mechanic's own state (orbs used, pending press, held, grounded, gravity); each
@@ -17,14 +17,18 @@ function Solve_stage(lv as object, s as integer) as object
         lo = {}
         hi = {}
         for each p in states
-            for a = 0 to 1
+            acts = [0, 1]
+            if p.mode = "fly" then acts = [-1, 0, 1]
+            for each a in acts
                 t = Run_clone(p)
                 t.prev = p
                 t.a = a
-                Run_step(t, a = 1)
+                if p.mode = "fly" then Run_step(t, false, a) else Run_step(t, a = 1)
                 if t.won or t.stage <> s then return Solve_path(t)
                 if not t.dead then
                     key = Str(Int(t.y * 2))
+                    ' the triangle can hover, so keep each speed, not only the extremes
+                    if t.mode = "fly" then key = key + Str(Int(t.vy * 34 + 100))
                     if t.mode = "jump" or t.mode = "flip" then
                         key = key + Str(t.grav) + Str(t.orbs.Count())
                         if t.buffer > 0 then key = key + "b"
@@ -59,26 +63,26 @@ function Solve_stage(lv as object, s as integer) as object
     return invalid
 end function
 
-' Walk back from the winning state to the start: run lengths of release / hold.
+' Walk back from the winning state to the start: runs of "value:frames".
 function Solve_path(t as object) as string
-    bits = []
+    vals = []
     while t.prev <> invalid
-        bits.Push(t.a)
+        vals.Push(t.a)
         t = t.prev
     end while
     out = ""
-    cur = 0
-    n = 0
-    for i = bits.Count() - 1 to 0 step -1
-        if bits[i] = cur then
+    i = vals.Count() - 1
+    while i >= 0
+        v = vals[i]
+        n = 0
+        while i >= 0 and vals[i] = v
             n = n + 1
-        else
-            out = out + n.ToStr() + " "
-            cur = bits[i]
-            n = 1
-        end if
-    end for
-    return out + n.ToStr()
+            i = i - 1
+        end while
+        if out <> "" then out = out + " "
+        out = out + v.ToStr() + ":" + n.ToStr()
+    end while
+    return out
 end function
 
 sub Solve_level(path as string)
