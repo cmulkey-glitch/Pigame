@@ -1,7 +1,7 @@
 title=Spiral Shift
 subtitle=One-button runner around the edges of your screen
 major_version=0
-minor_version=4
+minor_version=5
 build_version=1
 mm_icon_focus_hd=pkg:/images/icon_hd.png
 mm_icon_focus_sd=pkg:/images/icon_sd.png
