@@ -27,7 +27,7 @@ The levels form a spiral: beyond the inner ceiling of the side you are on lies t
 of the next level, full size and scrolling along, then the one after that, each a little
 shorter at both ends with its corners turning inward. Spiral mode plays
 them in a row: at the end of a level the shape becomes a rocket and the view slides inward to
-the next level, which waits for OK before it starts. Quitting a spiral run saves the
+the next level, and the run keeps going. Quitting a spiral run saves the
 level it was on, and the menu offers to continue from there.
 
 ## Remote

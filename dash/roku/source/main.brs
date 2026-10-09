@@ -17,7 +17,7 @@
 '
 ' The spiral: the levels after the one being played lie inward of it, one ring (Ring_rows) per
 ' level, drawn full size beyond its inner ceiling (Draw_rings). Spiral mode plays the levels
-' in a row; at the end of each the view slides inward to the next (Zoom_*), which waits for OK.
+' in a row; at the end of each the view slides inward to the next (Zoom_*) and play goes on.
 '
 ' Remote: OK, Play or Up is the button (jump / zig-zag; see game.brs); the arrows steer the
 ' triangle and switch the square's side (App_steer); * or Back
@@ -268,25 +268,16 @@ function App_key(code as integer) as boolean
                 from = m.spiralSaved()
                 if m.spiralNew then from = 0
                 m.attempts = 1
-                m.begin(from)
+                m.begin(from, false)
             end if
         end if
-    else if m.mode = "play" or m.mode = "ready" then
+    else if m.mode = "play" then
         if code = 0 or code = 10 then
             ' Back or *: pause
             m.resumeMode = m.mode
             m.mode = "paused"
             m.pauseSel = 0
             m.music.Pause()
-        else if m.mode = "ready" then
-            if code = 6 or code = 13 then
-                m.mode = "play"
-                m.pause = 20
-                m.banner = "STAGE 1"
-                m.music.Stop()
-                m.music.SetContentList([{ url: "pkg:/sounds/" + m.lv.music + ".mp3" }])
-                m.music.Play()
-            end if
         else if isJump then
             ' every press counts, even if its release has not arrived yet or came in the same
             ' frame (a quick second tap for an orb)
@@ -334,8 +325,9 @@ sub App_start(i as integer)
     m.mode = "play"
 end sub
 
-' Spiral mode: set up level i at its start and wait for OK ("ready").
-sub App_begin(i as integer)
+' Spiral mode: start level i. From the menu it opens with the usual "STAGE 1" moment; carried
+' on from the level before (follow), the run just keeps going.
+sub App_begin(i as integer, follow as boolean)
     m.lv = m.levels[i]
     m.sel = i
     m.saveSpiral(i)
@@ -346,10 +338,16 @@ sub App_begin(i as integer)
     m.zoom = invalid
     m.deadTicks = 0
     m.tapped = false
-    m.pause = 0
-    m.banner = ""
+    m.pause = 45
+    m.banner = "LEVEL " + (i + 1).ToStr()
+    if follow then
+        m.pause = 0
+        m.banner = ""
+    end if
     m.music.Stop()
-    m.mode = "ready"
+    m.music.SetContentList([{ url: "pkg:/sounds/" + m.lv.music + ".mp3" }])
+    m.music.Play()
+    m.mode = "play"
 end sub
 
 ' After a crash: back to the start of the stage (the last checkpoint).
@@ -699,10 +697,6 @@ sub App_draw(alpha as float)
         m.screen.DrawRect(Int(p.x), Int(p.y), p.size, p.size, p.color)
     end for
     Draw_hud(m, r)
-    if m.mode = "ready" or (m.mode = "paused" and m.resumeMode = "ready") then
-        Draw_center_at(m.screen, "Level " + (m.sel + 1).ToStr() + ":  " + m.lv.name, 640, 100, &hFFFFFFFF, m.big)
-        Draw_center_at(m.screen, "Press OK to start", 640, 180, &hFFE14DFF, m.mid)
-    end if
     if m.mode = "paused" then Draw_pause(m)
 end sub
 
@@ -901,7 +895,7 @@ sub Zoom_tick(app as object)
             Spark(app, p.x + (Rnd(0) - 0.5) * 12, p.y + 40 + (Rnd(0) - 0.5) * 12, (Rnd(0) - 0.5) * 2, 2 + Rnd(0) * 5, 5 + Rnd(7), flame[Rnd(3) - 1], 18)
         end for
     end if
-    if z.t >= ph.pop then app.begin(z.from + 1)
+    if z.t >= ph.pop then app.begin(z.from + 1, true)
 end sub
 
 sub Zoom_draw(app as object)
