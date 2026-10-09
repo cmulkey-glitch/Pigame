@@ -10,8 +10,8 @@ fairly from where the previous pattern left the player:
     patterns put their hazard on the side the square is on, so each needs a flip.
   fly / wave (hold modes): a search over hold / release keeps every surviving state; the
     states that also make it through the pattern must span at least min_slack blocks of
-    height at every frame (how much room there is to be off the ideal line): 2 blocks on
-    level 1 down to 1 for the triangle, 1.5 down to 0.75 for the diamond.
+    height at every frame (how much room there is to be off the ideal line): 1.5 blocks on
+    level 1 down to 0.5 for the triangle, 1.5 down to 0.75 for the diamond.
 Patterns that fail are swapped for another; the seed makes the output repeatable.
 
 The physics here is a Python copy of Run_step, used for design only (float64 vs the device's
@@ -280,7 +280,8 @@ def jump_patterns(d, rng):
 
 
 def fly_patterns(d, rng):
-    gap = 6 if d < 0.4 else 5 if d < 0.75 else 4
+    # rows open in a gate: 5 on level 1 (and kids), down to 2 from level 8
+    gap = 5 if d < 0.15 else 4 if d < 0.4 else 3 if d < 0.75 else 2
     def gate():
         a = rng.randint(1, H - gap - 1)
         return blocks(0, 0, 1, a) + blocks(0, a + gap, 1, H - a - gap), 1
@@ -296,16 +297,16 @@ def fly_patterns(d, rng):
             a = rng.randint(1, 2) if low else rng.randint(H - gap - 2, H - gap - 1)
             cells += blocks(c, 0, 1, a) + blocks(c, a + gap, 1, H - a - gap)
             low = not low
-            c += rng.randint(round(lerp(9, 5, d)), round(lerp(11, 6, d)))
+            c += rng.randint(round(lerp(8, 4, d)), round(lerp(10, 5, d)))
         return cells, c - 4
     pats = [
         lambda: (blocks(0, 0, 1, rng.randint(3, 6)), 1),
         lambda: (blocks(0, H - (h := rng.randint(3, 6)), 1, h), 1),
         gate,
     ]
-    if d >= 0.2:
+    if d >= 0.1:
         pats.append(slalom)
-    if d >= 0.4:
+    if d >= 0.3:
         pats += [tunnel, slalom]
     return pats
 
@@ -411,10 +412,10 @@ def lerp(a, b, t):
 
 def build_stage(mode, d, length, rng):
     min_window = round(lerp(12, 8, d))
-    min_slack = lerp(2.0, 1.0, d) if mode == 'fly' else lerp(1.5, 0.75, d)
+    min_slack = lerp(1.5, 0.5, d) if mode == 'fly' else lerp(1.5, 0.75, d)
     space = (round(lerp(5, 3, d)), round(lerp(9, 6, d)))     # blocks between patterns
     if mode == 'fly':
-        space = (round(lerp(10, 7, d)), round(lerp(14, 10, d)))
+        space = (round(lerp(8, 5, d)), round(lerp(12, 8, d)))
     if mode == 'wave':
         space = (round(lerp(7, 4, d)), round(lerp(11, 7, d)))
     if mode == 'flip':
@@ -490,7 +491,7 @@ def stage_ok(st, mode, d):
         return tap_check(st, new_state(mode), st.width + 1, round(lerp(12, 8, d))) is not None
     # room to manoeuvre is a per-pattern rule (measured to just past each pattern); end to
     # end, where one pattern can set up the next, at least half of it
-    slack = lerp(2.0, 1.0, d) if mode == 'fly' else lerp(1.5, 0.75, d)
+    slack = lerp(1.5, 0.5, d) if mode == 'fly' else lerp(1.5, 0.75, d)
     return hold_check(st, [new_state(mode)], st.width + 1, slack / 2, RUNWAY) is not None
 
 

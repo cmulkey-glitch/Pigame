@@ -12,7 +12,7 @@ Spiral Shift is a one-button runner that takes you around every edge of your TV.
 Each level is four sides of the screen, and each side changes how you play:
 - Ball (along the bottom): press to jump, hold to keep bouncing.
 - Triangle (up the right side): steer with Left and Right; it stays put when you let go.
-- Square (along the top): press to flip gravity between the edge and the ceiling.
+- Square (along the top): press Up or Down to switch gravity to that side.
 - Diamond (down the left side): hold to cut diagonally inward, let go to cut back.
 
 At every corner your shape turns into a rocket, blasts around the corner and becomes the next
@@ -29,4 +29,4 @@ you quit, so you can pick it up later.
 - Kids mode slows the whole game down without changing the levels
 - Best score saved for every level
 - Original music and art
-- Plays with your Roku remote: the OK button, plus the arrows to steer the triangle
+- Plays with your Roku remote: the OK button, plus the arrows for the triangle and the square

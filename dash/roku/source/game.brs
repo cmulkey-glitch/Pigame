@@ -14,7 +14,8 @@
 '   ball      jump: press to jump, hold to keep jumping as you land
 '   triangle  fly: steer with the arrows (steer = 1 inward, -1 toward the edge); no gravity, it
 '             stays where it is when you let go
-'   square    flip: press while on a surface to flip gravity between edge and ceiling
+'   square    flip: press the arrow toward the other side (steer 1 inward, -1 toward the edge)
+'             while on a surface to switch gravity to that side
 '   diamond   wave: hold to move diagonally inward, release to move diagonally back
 '
 ' Cells:
@@ -134,6 +135,8 @@ sub Run_enter(r as object, s as integer)
     r.y = 0.0
     r.vy = 0.0
     r.grav = 1          ' square: 1 pulls toward the edge, -1 toward the ceiling
+    r.want = 0          ' square: the side last asked for (steer), held for the buffer
+    r.steerPrev = 0
     r.grounded = true
     r.buffer = 0
     r.angle = 0.0
@@ -162,14 +165,15 @@ function Run_progress(r as object) as float
 end function
 
 ' One frame. held: the button is down this frame (a tap shorter than a frame still counts as
-' held for one frame). steer: the triangle's arrows, 1 inward, -1 toward the edge, 0 neither.
+' held for one frame). steer: the triangle's and square's arrows, 1 inward, -1 toward the
+' edge, 0 neither.
 ' Appends "jump", "orb", "pad", "flip", "die", "checkpoint", "win" to r.events.
 sub Run_step(r as object, held as boolean, steer = 0 as integer)
     if r.dead or r.won then return
     p = r.lv.phys
     st = r.st
     mode = r.mode
-    if held and not r.held then r.buffer = p.buffer
+    if held and not r.held and mode <> "flip" then r.buffer = p.buffer
     r.held = held
 
     if mode = "jump" then
@@ -192,12 +196,21 @@ sub Run_step(r as object, held as boolean, steer = 0 as integer)
             if r.vy < target then r.vy = target
         end if
     else if mode = "flip" then
+        ' a fresh arrow press asks for that side; it counts for the buffer, like a jump
+        if steer <> 0 and steer <> r.steerPrev then
+            r.want = steer
+            r.buffer = p.buffer
+        end if
         if r.grounded and r.buffer > 0 then
-            r.grav = -r.grav
-            r.vy = -r.grav * p.flipKick
-            r.grounded = false
+            wantGrav = 1
+            if r.want = 1 then wantGrav = -1
+            if wantGrav <> r.grav then
+                r.grav = wantGrav
+                r.vy = -r.grav * p.flipKick
+                r.grounded = false
+                r.events.Push("flip")
+            end if
             r.buffer = 0
-            r.events.Push("flip")
         end if
         r.vy = r.vy - p.flipG * r.grav
         if r.vy < -p.maxFall then r.vy = -p.maxFall
@@ -309,6 +322,7 @@ sub Run_step(r as object, held as boolean, steer = 0 as integer)
     end if
 
     if r.buffer > 0 then r.buffer = r.buffer - 1
+    r.steerPrev = steer
     if r.dead then
         r.events.Push("die")
     else if r.x >= st.width then

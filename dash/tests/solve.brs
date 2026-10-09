@@ -1,6 +1,6 @@
 ' Finds a way through each stage of a level with the real game code, for dash/tools/solve.mjs.
 ' Prints "STAGE <n> <runs>": runs of "value:frames", the value being the button (0 / 1), or
-' for the triangle the arrows (-1 / 0 / 1). dash/tests/tests.brs replays them.
+' for the triangle and square the arrows (-1 / 0 / 1). dash/tests/tests.brs replays them.
 
 ' Search over hold / release each frame. States are grouped by mode, half-block height band
 ' and the mechanic's own state (orbs used, pending press, held, grounded, gravity); each
@@ -19,11 +19,16 @@ function Solve_stage(lv as object, s as integer) as object
         for each p in states
             acts = [0, 1]
             if p.mode = "fly" then acts = [-1, 0, 1]
+            if p.mode = "flip" then
+                ' the square only ever needs the arrow toward the other side
+                acts = [0, 1]
+                if p.grav = -1 then acts = [0, -1]
+            end if
             for each a in acts
                 t = Run_clone(p)
                 t.prev = p
                 t.a = a
-                if p.mode = "fly" then Run_step(t, false, a) else Run_step(t, a = 1)
+                if p.mode = "fly" or p.mode = "flip" then Run_step(t, false, a) else Run_step(t, a = 1)
                 if t.won or t.stage <> s then return Solve_path(t)
                 if not t.dead then
                     key = Str(Int(t.y * 2))
@@ -34,6 +39,7 @@ function Solve_stage(lv as object, s as integer) as object
                         if t.buffer > 0 then key = key + "b"
                         if t.held then key = key + "h"
                         if t.grounded then key = key + "g"
+                        if t.mode = "flip" then key = key + Str(t.steerPrev)
                     end if
                     ' ties (the diamond's speed is constant) go to the lowest / highest
                     if lo[key] = invalid then

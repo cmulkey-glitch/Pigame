@@ -19,8 +19,8 @@
 ' level, drawn full size beyond its inner ceiling (Draw_rings). Spiral mode plays the levels
 ' in a row; at the end of each the view slides inward to the next (Zoom_*), which waits for OK.
 '
-' Remote: OK, Play or Up is the button (jump / flip / zig-zag; see game.brs); the arrows steer
-' the triangle (App_steer); * or Back
+' Remote: OK, Play or Up is the button (jump / zig-zag; see game.brs); the arrows steer the
+' triangle and switch the square's side (App_steer); * or Back
 ' pauses (Resume / Quit). Menu: Up / Down pick a row (level, speed, spiral run), Left / Right
 ' change it, OK starts, Back exits.
 
@@ -190,7 +190,7 @@ end function
 function Shape_info(mode as string) as object
     if mode = "jump" then return { name: "BALL", sheet: "ball", color: &hFFD23FFF, hint: "press to jump" }
     if mode = "fly" then return { name: "TRIANGLE", sheet: "triangle", color: &hFF6AD5FF, hint: "Left / Right to steer" }
-    if mode = "flip" then return { name: "SQUARE", sheet: "square", color: &h4DD6FFFF, hint: "press to flip gravity" }
+    if mode = "flip" then return { name: "SQUARE", sheet: "square", color: &h4DD6FFFF, hint: "Up / Down to switch sides" }
     return { name: "DIAMOND", sheet: "diamond", color: &h7CFF6BFF, hint: "hold to cut inward" }
 end function
 
@@ -446,11 +446,11 @@ sub App_step()
     r.events = []
 end sub
 
-' The triangle's steer from the arrows: the arrow pointing inward on its side of the screen
+' The triangle's and square's steer from the arrows: the arrow pointing inward on its side
 ' (away from the edge) is 1, the one pointing back at the edge -1. A tap shorter than a game
 ' step still counts for one step.
 function App_steer(app as object, r as object) as integer
-    if r.mode <> "fly" then return 0
+    if r.mode <> "fly" and r.mode <> "flip" then return 0
     inward = ["2", "4", "3", "5"]       ' Up, Left, Down, Right
     outward = ["3", "5", "2", "4"]
     a = inward[r.stage]
@@ -776,34 +776,53 @@ function Ring_rows() as integer
     return 11       ' a stage is 10 rows; the next ring's edge band is the 11th
 end function
 
+' How much shorter each ring inward is at each end of the screen, in blocks. (A true spiral
+' would need 11 per ring, which leaves nothing on a 16:9 screen; 3 reads as one.)
+function Ring_inset() as integer
+    return 3
+end function
+
 ' The levels after level idx on side sg, for a camera at camX, shaded so the stage in play
-' stands out. Each ring's start is a ring further along too, as in a real spiral.
+' stands out. Each ring is shorter than the one outside it by Ring_inset() at both ends, where
+' its band turns inward: the corners of the spiral. Its course scrolls with the run.
 sub Draw_rings(app as object, idx as integer, sg as integer, camX as float)
     s = app.screen
-    span = Run_len(sg) / 48.0 + 4
+    span = Run_len(sg) / 48.0
     for k = 1 to 2
         j = idx + k
         if j >= app.levels.Count() then exit for
         lv = app.levels[j]
         st = lv.stages[sg]
         base = Ring_rows() * k
-        b = View_rect(sg, camX - 2, base - 1, span, Ring_rows(), camX)
+        ' along the run, this ring covers [x0, x1] (local, for this camera)
+        x0 = camX + 1 + Ring_inset() * k
+        x1 = camX + span - 1 - Ring_inset() * k
+        if x1 <= x0 then exit for
+        deep = Ring_rows() * 2
+        b = View_rect(sg, x0, base - 1, x1 - x0, deep, camX)
         s.DrawRect(b.x, b.y, b.w, b.h, lv.bg)
-        e = View_rect(sg, camX - 2, base - 1, span, 1, camX)
+        e = View_rect(sg, x0 - 1, base - 1, x1 - x0 + 2, 1, camX)
         s.DrawRect(e.x, e.y, e.w, e.h, lv.ground)
+        ' the corners: the band turns inward at both ends
+        for each cx in [x0 - 1, x1]
+            t = View_rect(sg, cx, base - 1, 1, deep, camX)
+            s.DrawRect(t.x, t.y, t.w, t.h, lv.ground)
+        end for
         cam = camX - base
-        c0 = Int(cam) - 1
+        c0 = Int(x0 - base)
         if c0 < 0 then c0 = 0
-        c1 = Int(cam + span)
+        c1 = Int(x1 - base) - 1
         if c1 > st.width - 1 then c1 = st.width - 1
         for c = c0 to c1
-            col = st.cols[c]
-            for i = 0 to col.Count() - 1
-                Draw_cell(app, s, lv, sg, c, col[i], cam, base)
-            end for
+            if c + base >= x0 then
+                col = st.cols[c]
+                for i = 0 to col.Count() - 1
+                    Draw_cell(app, s, lv, sg, c, col[i], cam, base)
+                end for
+            end if
         end for
     end for
-    sh = View_rect(sg, camX - 2, 10, span, Ring_rows() * 2 + 2, camX)
+    sh = View_rect(sg, camX - 2, 10, span + 4, Ring_rows() * 2 + 2, camX)
     s.DrawRect(sh.x, sh.y, sh.w, sh.h, &h00000070)
 end sub
 

@@ -129,20 +129,25 @@ sub Test_physics()
     ' square
     flip = Mini("flip", Empty_rows(10))
     r = Run_new(flip)
-    Run_step(r, true)
+    Run_step(r, false, 1)
     n = 1
     while not r.grounded and n < 100
-        Run_step(r, false)
+        Run_step(r, false, 0)
         n = n + 1
     end while
-    Check(r.grav = -1 and r.y = 9 and n < 24, "square flips to the ceiling in under 24 frames (" + n.ToStr() + ")")
-    r = Hold(flip, 80)
-    Check(r.grav = -1 and r.y = 9, "holding flips once, not again on landing")
+    Check(r.grav = -1 and r.y = 9 and n < 24, "square switches to the ceiling in under 24 frames (" + n.ToStr() + ")")
+    r = Steer(flip, [1, 80])
+    Check(r.grav = -1 and r.y = 9, "holding the arrow switches once, not again on landing")
+    r = Steer(flip, [1, 40, 0, 2, -1, 40])
+    Check(r.grav = 1 and r.y = 0, "the other arrow switches back to the edge")
+    r = Steer(flip, [-1, 1, 0, 40])
+    Check(r.grav = 1 and r.y = 0, "the arrow toward the side it is on does nothing")
+    Check(Hold(flip, 60).grav = 1, "the OK button does not switch the square")
     floorSpikes = Mini("flip", Empty_rows(9) + "..........^^^^^^^^......................")
-    Check(Play(floorSpikes, [], 120).dead, "square on the edge crashes into spikes")
-    Check(not Play(floorSpikes, [10], 120).dead, "square on the ceiling passes over them")
+    Check(Steer(floorSpikes, [0, 120]).dead, "square on the edge crashes into spikes")
+    Check(not Steer(floorSpikes, [0, 10, 1, 1, 0, 110]).dead, "square on the ceiling passes over them")
     under = Mini("flip", ".........##############################." + Chr(10) + Empty_rows(9))
-    r = Play(under, [60], 100)
+    r = Steer(under, [0, 60, 1, 1, 0, 40])
     Check(not r.dead and r.grav = -1 and r.y = 8, "square lands on a block's underside (y=" + Str(r.y) + ")")
 
     ' diamond
@@ -196,7 +201,7 @@ sub Test_level(n as integer)
 end sub
 
 ' Replay "STAGE s runs" from the solutions file: runs of "value:frames" (the button 0 / 1, or the
-' triangle's arrows -1 / 0 / 1).
+' triangle's and square's arrows -1 / 0 / 1).
 function Replay(lv as object, s as integer, sols as object, line as integer) as boolean
     if line >= sols.Count() then return false
     parts = sols[line].Split(" ")
@@ -207,7 +212,7 @@ function Replay(lv as object, s as integer, sols as object, line as integer) as 
         seg = parts[i].Split(":")
         v = seg[0].ToInt()
         for f = 1 to seg[1].ToInt()
-            if r.mode = "fly" then Run_step(r, false, v) else Run_step(r, v = 1)
+            if r.mode = "fly" or r.mode = "flip" then Run_step(r, false, v) else Run_step(r, v = 1)
             if r.dead then return false
             if r.won or r.stage <> s then return true
         end for
