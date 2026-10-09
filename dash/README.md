@@ -37,7 +37,7 @@ level it was on, and the menu offers to continue from there.
 ## Build and sideload
 ```
 pip install pillow lameenc
-python3 dash/tools/build.py        # -> dist/spiral-shift-roku.zip
+python3 dash/tools/build.py        # -> dist/spiral-shift-roku-<version>.zip
 ```
 Enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, Right), open
 `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press Install.

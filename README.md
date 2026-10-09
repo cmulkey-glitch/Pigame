@@ -68,6 +68,6 @@ chambers (playtest).
 ## Spiral Shift (Roku)
 A separate, original one-button runner for Roku lives in `dash/`; see `dash/README.md`.
 ```
-python3 dash/tools/build.py       # -> dist/spiral-shift-roku.zip
+python3 dash/tools/build.py       # -> dist/spiral-shift-roku-<version>.zip
 node dash/tools/test.mjs          # physics checks + every stage solved + compile check
 ```

@@ -32,13 +32,19 @@ function Kids_speed() as float
     return 0.65
 end function
 
-sub Main()
+' args: launch parameters (deep links); the game has no content to link to, so it opens the menu.
+sub Main(args as dynamic)
     port = CreateObject("roMessagePort")
     screen = CreateObject("roScreen", true, 1280, 720)
     screen.SetMessagePort(port)
     screen.SetAlphaEnable(true)
 
     app = App_new(screen)
+    Deep_link(app, args)
+    Memory_watch(port)
+    ' deep links while running (supports_input_launch in the manifest): accepted, nothing to open
+    input = CreateObject("roInput")
+    if input <> invalid then input.SetMessagePort(port)
     clock = CreateObject("roTimespan")
     tickMs = 1000.0 / 60
     acc = 0.0
@@ -52,6 +58,10 @@ sub Main()
                     app.music.Stop()
                     return
                 end if
+            else if type(msg) = "roAppMemoryMonitorEvent" then
+                App_low_memory(app)
+            else if type(msg) = "roInputEvent" then
+                if msg.IsInput() then Deep_link(app, msg.GetInfo())
             end if
             msg = port.GetMessage()
         end while
@@ -78,6 +88,42 @@ sub Main()
         app.draw(gacc / stepMs)
         screen.SwapBuffers()
     end while
+end sub
+
+' A deep link (at launch, or while running): contentId "level<N>" opens that level's menu
+' entry; anything else just shows the menu.
+sub Deep_link(app as object, info as dynamic)
+    if info = invalid or type(info) <> "roAssociativeArray" then return
+    contentId = info.contentId
+    mediaType = info.mediaType
+    if contentId = invalid or mediaType = invalid then return
+    if Left(contentId, 5) = "level" then
+        n = Mid(contentId, 6).ToInt()
+        if n >= 1 and n <= app.levels.Count() and app.mode = "menu" then app.sel = n - 1
+    end if
+end sub
+
+' Roku asks apps to watch their memory. Ask to be told when it runs low (App_low_memory frees
+' what can be rebuilt). Guarded: older firmware lacks some of these calls.
+sub Memory_watch(port as object)
+    try
+        mon = CreateObject("roAppMemoryMonitor")
+        if mon = invalid then return
+        mon.SetMessagePort(port)
+        mon.EnableMemoryWarningEvent(true)
+        mon.EnableLowGeneralMemoryEvent(true)
+        print "memory: limit"; mon.GetChannelMemoryLimit(); " KB, available"; mon.GetChannelAvailableMemory(); " KB, used"; mon.GetMemoryLimitPercent(); "%"
+    catch e
+        print "memory monitor unavailable: "; e.message
+    end try
+end sub
+
+' Low on memory: drop the spiral transition's snapshots (Zoom_start makes them again).
+sub App_low_memory(app as object)
+    if app.mode <> "zoom" then
+        app.snap = invalid
+        app.snapNext = invalid
+    end if
 end sub
 
 function App_new(screen as object) as object
@@ -770,6 +816,8 @@ end function
 
 ' Snapshot the last frame of this level and the first of the next.
 sub Zoom_start(app as object)
+    if app.snap = invalid then app.snap = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
+    if app.snapNext = invalid then app.snapNext = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
     r = app.run
     e = r.exit
     st = app.lv.stages[e.stage]

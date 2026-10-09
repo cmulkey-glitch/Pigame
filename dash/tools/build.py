@@ -1,4 +1,4 @@
-"""Build the Spiral Shift sideload package: dist/spiral-shift-roku.zip.
+"""Build the Spiral Shift package: dist/spiral-shift-roku-<version>.zip (sideload or dashboard).
 
 Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
 generated assets:
@@ -349,7 +349,7 @@ def main():
         down(pad().rotate(90 * side)).save(img(f'pad_{side}.png'))
     orb().save(img('orb.png'))
     poster(290, 218).save(img('icon_hd.png'))
-    poster(214, 144).save(img('icon_sd.png'))
+    poster(246, 140).save(img('icon_sd.png'))
     poster(1280, 720).save(img('splash_hd.png'))
     # store listing artwork for the developer dashboard (not in the package)
     store = os.path.join(DIST, 'store')
@@ -365,7 +365,10 @@ def main():
     write_wav(snd('checkpoint.wav'), sfx_checkpoint())
     write_wav(snd('rocket.wav'), sfx_rocket())
 
-    out = os.path.join(DIST, 'spiral-shift-roku.zip')
+    # the version in the name, so an older download is never uploaded by mistake
+    man = dict(l.split('=', 1) for l in open(os.path.join(SRC, 'manifest')).read().split('\n') if '=' in l)
+    version = f"{man['major_version']}.{man['minor_version']}.{man['build_version']}"
+    out = os.path.join(DIST, f'spiral-shift-roku-{version}.zip')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         for base, _, files in os.walk(STAGE):
             for f in sorted(files):
