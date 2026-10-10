@@ -17,7 +17,9 @@
 '
 ' The spiral: the levels after the one being played lie inward of it, one ring (Ring_rows) per
 ' level, drawn full size beyond its inner ceiling (Draw_rings). Spiral mode plays the levels
-' in a row; at the end of each the view slides inward to the next (Zoom_*) and play goes on.
+' in a row: the end of a level is a corner like any other, rounded into the next level's first
+' side one ring in. At the centre of the spiral is the core (Draw_rings); a spiral run ends by
+' flying into it (Finale_*).
 '
 ' Remote: OK, Play or Up is the button (jump / zig-zag; see game.brs); the arrows steer the
 ' triangle and switch the square's side (App_steer); * or Back
@@ -103,8 +105,7 @@ sub Deep_link(app as object, info as dynamic)
     end if
 end sub
 
-' Roku asks apps to watch their memory. Ask to be told when it runs low (App_low_memory frees
-' what can be rebuilt). Guarded: older firmware lacks some of these calls.
+' Roku asks apps to watch their memory. Ask to be told when it runs low (App_low_memory). Guarded: older firmware lacks some of these calls.
 sub Memory_watch(port as object)
     try
         mon = CreateObject("roAppMemoryMonitor")
@@ -118,12 +119,9 @@ sub Memory_watch(port as object)
     end try
 end sub
 
-' Low on memory: drop the spiral transition's snapshots (Zoom_start makes them again).
+' Low on memory: the game keeps nothing large it could rebuild; drop the particles.
 sub App_low_memory(app as object)
-    if app.mode <> "zoom" then
-        app.snap = invalid
-        app.snapNext = invalid
-    end if
+    app.parts = []
 end sub
 
 function App_new(screen as object) as object
@@ -132,7 +130,7 @@ function App_new(screen as object) as object
         screen: screen, screenMain: screen, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, kids: false
         attempts: 0, deadTicks: 0, pause: 0, banner: "", frame: 0, parts: [], trans: invalid
         spiral: false, zoom: invalid, menuRow: 0, spiralNew: false, pauseSel: 0, resumeMode: ""
-        snap: invalid, snapNext: invalid, arrows: {}, arrowTaps: {}
+        finale: invalid, arrows: {}, arrowTaps: {}
         prev: invalid, roll: 0.0, squash: 0, wasGrounded: true
         jumpDown: false, tapped: false
         reg: CreateObject("roRegistrySection", "spiralshift")
@@ -168,9 +166,7 @@ function App_new(screen as object) as object
     app.sheets.nose = Sheet(CreateObject("roBitmap", "pkg:/images/nose.png"), 48)
     app.sheets.fin = Sheet(CreateObject("roBitmap", "pkg:/images/fin.png"), 48)
 
-    ' the spiral transition's snapshots: the last frame of a level and the first of the next
-    app.snap = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
-    app.snapNext = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
+    app.img.core = CreateObject("roBitmap", "pkg:/images/core.png")
     return app
 end function
 
@@ -369,8 +365,8 @@ end function
 ' 60 a second, in every mode: animations and timers.
 sub App_tick()
     m.frame = m.frame + 1
-    if m.mode = "zoom" then
-        Zoom_tick(m)
+    if m.mode = "finale" then
+        Finale_tick(m)
         return
     end if
     if m.mode <> "play" then return
@@ -426,17 +422,23 @@ sub App_step()
             end for
         else if e = "checkpoint" then
             m.sfxCheck.Trigger(90)
-            m.trans = { t: 0, exit: r.exit }
+            m.trans = { t: 0, exit: r.exit, lv: m.lv, sel: m.sel }
             m.wasGrounded = true
         else if e = "win" then
             m.setBest(m.sel, 100)
             if m.spiral and m.sel < m.levels.Count() - 1 then
+                ' the end of a level is a corner like any other: round it into the next one
                 m.sfxCheck.Trigger(90)
-                Zoom_start(m)
+                oldLv = m.lv
+                oldSel = m.sel
+                m.begin(m.sel + 1, true)
+                m.trans = { t: 0, exit: r.exit, lv: oldLv, sel: oldSel }
+            else if m.spiral then
+                m.saveSpiral(0)
+                Finale_start(m)
             else
                 m.music.Stop()
                 m.sfxWin.Trigger(90)
-                if m.spiral then m.saveSpiral(0)
                 m.mode = "complete"
             end if
         end if
@@ -479,6 +481,7 @@ sub Trans_tick(app as object)
     t.t = t.t + 1
     if t.t = ph.corner then
         app.banner = Shape_info(t.exit.mode).name + "  >>  " + Shape_info(app.run.mode).name
+        if t.sel <> app.sel then app.banner = "LEVEL " + (app.sel + 1).ToStr()
     else if t.t = ph.build then
         ' the parts lock on
         c = Trans_corner(app)
@@ -520,7 +523,7 @@ end sub
 ' Screen center of the corner cell: the end of the old stage, on its edge.
 function Trans_corner(app as object) as object
     e = app.trans.exit
-    st = app.lv.stages[e.stage]
+    st = app.trans.lv.stages[e.stage]
     b = View_rect(e.stage, st.width, 0, 1, 1, Cam_clamp(e.stage, st.width, st.width))
     return { x: b.x + 24, y: b.y + 24 }
 end function
@@ -558,16 +561,22 @@ sub Trans_draw(app as object)
     ph = Trans_phases()
     ns = app.run.stage
     if t.t < ph.ignite then
-        ' the old stage, its camera still stopped at the end
-        st = app.lv.stages[e.stage]
+        ' the old stage (perhaps of the level before), its camera still stopped at the end
+        st = t.lv.stages[e.stage]
+        lv = app.lv
+        sel = app.sel
+        app.lv = t.lv
+        app.sel = t.sel
         Draw_stage(app, e.stage, st, e.mode, Cam_clamp(e.stage, st.width, st.width))
+        app.lv = lv
+        app.sel = sel
     else
         Draw_stage(app, ns, app.run.st, app.run.mode, Cam_x(app.run, 0))
     end if
     c = Trans_corner(app)
     if t.t < ph.corner then
         ' roll into the corner
-        st = app.lv.stages[e.stage]
+        st = t.lv.stages[e.stage]
         ex = View_rect(e.stage, e.x, e.y, 1, 1, Cam_clamp(e.stage, st.width, st.width))
         f = Ease(t.t / ph.corner)
         Draw_shape(app, e.mode, e.stage, e.angle + t.t * 20, ex.x + 24 + (c.x - ex.x - 24) * f, ex.y + 24 + (c.y - ex.y - 24) * f, 1.0)
@@ -667,8 +676,8 @@ sub App_draw(alpha as float)
         Draw_menu(m)
         return
     end if
-    if m.mode = "zoom" then
-        Zoom_draw(m)
+    if m.mode = "finale" then
+        Finale_draw(m)
         return
     end if
     r = m.run
@@ -779,7 +788,11 @@ sub Draw_rings(app as object, idx as integer, sg as integer, camX as float, widt
     span = Run_len(sg) / 48.0
     for k = 1 to 2
         j = idx + k
-        if j >= app.levels.Count() then exit for
+        if j >= app.levels.Count() then
+            ' past the last level: the core at the centre of the spiral
+            Draw_core(app, sg, camX, width, Ring_rows() * k)
+            exit for
+        end if
         lv = app.levels[j]
         st = lv.stages[sg]
         base = Ring_rows() * k
@@ -819,61 +832,45 @@ sub Draw_rings(app as object, idx as integer, sg as integer, camX as float, widt
     s.DrawRect(sh.x, sh.y, sh.w, sh.h, &h00000070)
 end sub
 
-' Spiral mode, end of a level: the shape becomes a rocket in the corner, and the view slides
-' inward (down the screen) to the next level, which the rocket flies to. Tick at which each
+' The core, at the centre of the spiral: where the next ring would be (base rows in), halfway
+' along the side, gently pulsing.
+sub Draw_core(app as object, sg as integer, camX as float, width as integer, base as integer)
+    b = View_rect(sg, width / 2.0, base + 1.5, 0, 0, camX)
+    k = 1.0 + 0.06 * Sin(app.frame / 10.0)
+    app.screen.DrawScaledObject(Int(b.x - 96 * k), Int(b.y - 96 * k), k, k, app.img.core)
+end sub
+
+' ---- the finale ----
+' The end of a spiral run: the last shape becomes a rocket in the corner and flies into the
+' core in the middle of the screen, which flares until the screen is white. Tick at which each
 ' phase ends:
-function Zoom_phases() as object
-    return { build: 20, slide: 80, pop: 92 }
+function Finale_phases() as object
+    return { build: 20, fly: 80, flare: 120, done: 140 }
 end function
 
-' Snapshot the last frame of this level and the first of the next.
-sub Zoom_start(app as object)
-    if app.snap = invalid then app.snap = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
-    if app.snapNext = invalid then app.snapNext = CreateObject("roBitmap", { width: 1280, height: 720, AlphaEnable: true })
-    r = app.run
-    e = r.exit
-    st = app.lv.stages[e.stage]
-    app.screen = app.snap
-    Draw_stage(app, e.stage, st, e.mode, Cam_clamp(e.stage, st.width, st.width))
-    lv = app.lv
-    sel = app.sel
-    app.sel = sel + 1
-    app.lv = app.levels[app.sel]
-    nxt = app.lv.stages[0]
-    app.screen = app.snapNext
-    Draw_stage(app, 0, nxt, nxt.mode, Cam_clamp(0, nxt.width, 0))
-    app.lv = lv
-    app.sel = sel
-    app.screen = app.screenMain
-    app.zoom = { t: 0, from: sel, exit: e }
-    app.mode = "zoom"
+sub Finale_start(app as object)
+    app.finale = { t: 0, exit: app.run.exit }
+    app.mode = "finale"
     app.banner = ""
 end sub
 
-' The rocket's corner on the old frame and the start on the new one, at slide f (0..1).
-function Zoom_points(app as object, f as float) as object
-    e = app.zoom.exit
-    st = app.levels[app.zoom.from].stages[e.stage]
+function Finale_corner(app as object) as object
+    e = app.finale.exit
+    st = app.lv.stages[e.stage]
     b = View_rect(e.stage, st.width, 0, 1, 1, Cam_clamp(e.stage, st.width, st.width))
-    nxt = app.levels[app.zoom.from + 1].stages[0]
-    n = View_rect(0, 0, 0, 1, 1, Cam_clamp(0, nxt.width, 0))
-    return { corner: { x: b.x + 24, y: b.y + 24 + 720 * f }, start: { x: n.x + 24, y: n.y + 24 - 720 * (1 - f) } }
+    return { x: b.x + 24, y: b.y + 24 }
 end function
 
-function Zoom_f(app as object) as float
-    ph = Zoom_phases()
-    return Ease((app.zoom.t - ph.build) / (ph.slide - ph.build))
+function Finale_rocket(app as object) as object
+    ph = Finale_phases()
+    c = Finale_corner(app)
+    f = Ease((app.finale.t - ph.build) / (ph.fly - ph.build))
+    return { x: c.x + (640 - c.x) * f, y: c.y + (360 - c.y) * f }
 end function
 
-function Zoom_rocket(app as object) as object
-    f = Zoom_f(app)
-    pts = Zoom_points(app, f)
-    return { x: pts.corner.x + (pts.start.x - pts.corner.x) * f, y: pts.corner.y + (pts.start.y - pts.corner.y) * f }
-end function
-
-sub Zoom_tick(app as object)
-    z = app.zoom
-    ph = Zoom_phases()
+sub Finale_tick(app as object)
+    z = app.finale
+    ph = Finale_phases()
     z.t = z.t + 1
     alive = []
     for each p in app.parts
@@ -883,52 +880,58 @@ sub Zoom_tick(app as object)
         if p.life > 0 then alive.Push(p)
     end for
     app.parts = alive
-    if z.t = ph.build then
-        app.sfxRocket.Trigger(80)
-        app.banner = "LEVEL " + (z.from + 2).ToStr()
-    end if
-    if z.t > ph.build and z.t < ph.slide then
-        p = Zoom_rocket(app)
+    if z.t = ph.build then app.sfxRocket.Trigger(80)
+    if z.t > ph.build and z.t < ph.fly then
+        p = Finale_rocket(app)
         flame = [&hFFE14DFF, &hFF8A2BFF, &hFF4D4DFF]
         for i = 1 to 3
-            Spark(app, p.x + (Rnd(0) - 0.5) * 12, p.y + 40 + (Rnd(0) - 0.5) * 12, (Rnd(0) - 0.5) * 2, 2 + Rnd(0) * 5, 5 + Rnd(7), flame[Rnd(3) - 1], 18)
+            Spark(app, p.x + (Rnd(0) - 0.5) * 12, p.y + 30 + (Rnd(0) - 0.5) * 12, (Rnd(0) - 0.5) * 2, 2 + Rnd(0) * 4, 5 + Rnd(7), flame[Rnd(3) - 1], 18)
         end for
     end if
-    if z.t >= ph.pop then app.begin(z.from + 1, true)
+    if z.t = ph.fly then
+        app.music.Stop()
+        app.sfxWin.Trigger(90)
+        for i = 1 to 40
+            a = Rnd(0) * 6.283
+            sp = 3 + Rnd(0) * 9
+            Spark(app, 640, 360, Cos(a) * sp, Sin(a) * sp, 6 + Rnd(8), &hFFE14DFF, 40)
+        end for
+    end if
+    if z.t >= ph.done then
+        app.finale = invalid
+        app.mode = "complete"
+    end if
 end sub
 
-sub Zoom_draw(app as object)
+sub Finale_draw(app as object)
     s = app.screen
-    z = app.zoom
-    ph = Zoom_phases()
-    f = Zoom_f(app)
-    s.Clear(&h000000FF)
-    s.DrawObject(0, Int(720 * f), app.snap)
-    s.DrawObject(0, Int(-720 * (1 - f)), app.snapNext)
+    z = app.finale
+    ph = Finale_phases()
     e = z.exit
+    st = app.lv.stages[e.stage]
+    Draw_stage(app, e.stage, st, e.mode, Cam_clamp(e.stage, st.width, st.width))
+    ' the core in the middle, growing once the rocket is in
+    k = 1.0 + 0.06 * Sin(app.frame / 10.0)
+    if z.t > ph.fly then k = k + 9 * Ease((z.t - ph.fly) / (ph.flare - ph.fly))
+    s.DrawScaledObject(Int(640 - 96 * k), Int(360 - 96 * k), k, k, app.img.core)
     if z.t < ph.build then
-        ' the shape becomes the rocket's body as the parts fly in
-        c = Zoom_points(app, 0).corner
+        c = Finale_corner(app)
         Draw_shape(app, e.mode, e.stage, e.angle, c.x, c.y, 1.0)
         Draw_parts(app, 1, c.x, c.y, (1 - Ease(z.t / ph.build)) * 150, 1.0)
-    else if z.t < ph.slide then
-        p = Zoom_rocket(app)
-        if f < 0.5 then
-            Draw_shape(app, e.mode, e.stage, e.angle, p.x, p.y, 1.0)
-        else
-            Draw_shape(app, "jump", 0, 0, p.x, p.y, 1.0)
-        end if
-        Draw_parts(app, 1, p.x, p.y, 0, 1.0)
-    else
-        p = Zoom_points(app, 1).start
-        k = (z.t - ph.slide) / (ph.pop - ph.slide)
-        Draw_shape(app, "jump", 0, 0, p.x, p.y, 1.0 + 0.25 * Sin(k * 3.14))
-        Draw_parts(app, 1, p.x, p.y, k * 120, 1 - k)
+    else if z.t < ph.fly then
+        p = Finale_rocket(app)
+        shrink = 1.0
+        if z.t > ph.fly - 12 then shrink = (ph.fly - z.t) / 12.0
+        Draw_shape(app, e.mode, e.stage, e.angle, p.x, p.y, shrink)
+        Draw_parts(app, 1, p.x, p.y, 0, shrink)
     end if
     for each q in app.parts
         s.DrawRect(Int(q.x), Int(q.y), q.size, q.size, q.color)
     end for
-    if app.banner <> "" then Draw_center_at(s, app.banner, 640, 120, &hFFFFFFFF, app.big)
+    if z.t > ph.fly then
+        a = Int(255 * Ease((z.t - ph.fly) / (ph.flare - ph.fly)))
+        s.DrawRect(0, 0, 1280, 720, &hFFFFFF00 + a)
+    end if
 end sub
 
 ' The four edge bands; the active one is lit and its marks scroll with the run.

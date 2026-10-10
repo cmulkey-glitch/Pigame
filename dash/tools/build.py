@@ -3,7 +3,8 @@
 Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
 generated assets:
   images/ball, triangle, square, diamond.png   player frames, 72 px squares (main.brs);
-                                               nose, fin.png: rocket parts for the corner animation
+                                               nose, fin.png: rocket parts for the corner animation;
+                                               core.png: the centre of the spiral
   images/spike_N, pad_N.png                    turned for side N; orb.png; icons, splash
   sounds/level1-10.mp3                         8-bar chiptune loops; die, complete, rocket,
                                                checkpoint.wav
@@ -104,6 +105,26 @@ def diamond():
     d.polygon([((c - 20) * S, c * S), (c * S, (c - 12) * S), ((c + 20) * S, c * S), (c * S, (c + 12) * S)], fill=DIAMOND + (255,))
     d.polygon([((c - 8) * S, c * S), (c * S, (c - 5) * S), ((c + 8) * S, c * S), (c * S, (c + 5) * S)], fill=(230, 255, 225, 255))
     return img
+
+
+def core():
+    """The core at the centre of the spiral: a glowing eight-pointed star, 192 px."""
+    size = 192
+    img = canvas(size, size)
+    d = ImageDraw.Draw(img)
+    S, c = SS, size // 2
+    for r, a in ((92, 30), (76, 50), (60, 80)):
+        d.ellipse([(c - r) * S, (c - r) * S, (c + r) * S, (c + r) * S], fill=(255, 225, 77, a))
+    for i in range(8):
+        ang = i * math.pi / 4
+        long = 88 if i % 2 == 0 else 60
+        tip = (c + long * math.cos(ang), c + long * math.sin(ang))
+        side1 = (c + 14 * math.cos(ang + math.pi / 2), c + 14 * math.sin(ang + math.pi / 2))
+        side2 = (c + 14 * math.cos(ang - math.pi / 2), c + 14 * math.sin(ang - math.pi / 2))
+        d.polygon([(x * S, y * S) for x, y in (tip, side1, side2)], fill=(255, 240, 160, 255))
+    d.ellipse([(c - 34) * S, (c - 34) * S, (c + 34) * S, (c + 34) * S], fill=(255, 250, 220, 255))
+    d.ellipse([(c - 20) * S, (c - 20) * S, (c + 20) * S, (c + 20) * S], fill=(255, 255, 255, 255))
+    return down(img)
 
 
 def nose():
@@ -348,6 +369,7 @@ def main():
         down(spike().rotate(90 * side)).save(img(f'spike_{side}.png'))
         down(pad().rotate(90 * side)).save(img(f'pad_{side}.png'))
     orb().save(img('orb.png'))
+    core().save(img('core.png'))
     poster(290, 218).save(img('icon_hd.png'))
     poster(246, 140).save(img('icon_sd.png'))
     poster(1280, 720).save(img('splash_hd.png'))
