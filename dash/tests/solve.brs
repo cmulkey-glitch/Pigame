@@ -11,7 +11,7 @@ function Solve_stage(lv as object, s as integer) as object
     Run_enter(start, s)
     start.prev = invalid
     start.a = 0
-    frames = Int(start.st.width / lv.phys.speed) + 20
+    frames = Int(start.st.width / start.st.phys.speed) + 20
     states = [start]
     for f = 1 to frames
         lo = {}
@@ -97,4 +97,5 @@ sub Solve_level(path as string)
         sol = Solve_stage(lv, s)
         if sol <> invalid then print "STAGE " + s.ToStr() + " " + sol.ToStr()    ' ToStr: brs cannot concatenate it as returned
     end for
+    print "STAGES " + lv.stages.Count().ToStr()
 end sub

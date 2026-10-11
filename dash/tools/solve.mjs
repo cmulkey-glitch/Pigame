@@ -4,6 +4,8 @@
 // dash/tools/levelgen.py rewrites the levels). Levels run in parallel; a few minutes in all.
 // Needs `npm install -g brs`, or BRS= the path to it.
 // Usage: node dash/tools/solve.mjs [level numbers...]
+//        node dash/tools/solve.mjs pool [tiers...]   (the random-world pool, dash/roku/pool/T.txt,
+//                                                     to dash/tests/solutions/poolT.txt)
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir } from 'node:os';
@@ -13,15 +15,19 @@ import { dirname, join } from 'node:path';
 const dash = join(dirname(fileURLToPath(import.meta.url)), '..');
 const root = join(dash, '..');
 const brs = process.env.BRS || spawnSync('which', ['brs'], { encoding: 'utf8' }).stdout.trim();
-const all = readdirSync(join(dash, 'roku', 'levels')).filter((f) => /^\d+\.txt$/.test(f))
+const pool = process.argv[2] === 'pool';
+const args = process.argv.slice(pool ? 3 : 2);
+const dir = pool ? 'pool' : 'levels';
+const all = readdirSync(join(dash, 'roku', dir)).filter((f) => /^\d+\.txt$/.test(f))
   .map((f) => parseInt(f)).sort((a, b) => a - b);
-const levels = process.argv.length > 2 ? process.argv.slice(2).map(Number) : all;
+const levels = args.length ? args.map(Number) : all;
+const what = pool ? 'tier' : 'level';
 const tmp = mkdtempSync(join(tmpdir(), 'solve-'));
 mkdirSync(join(dash, 'tests', 'solutions'), { recursive: true });
 
 function solve(n) {
   const entry = join(tmp, `main${n}.brs`);
-  writeFileSync(entry, `sub Main()\n    Solve_level("pkg:/roku/levels/${n}.txt")\nend sub\n`);
+  writeFileSync(entry, `sub Main()\n    Solve_level("pkg:/roku/${dir}/${n}.txt")\nend sub\n`);
   return new Promise((done) => {
     const p = spawn(process.execPath, [join(root, 'tools', 'brs-device.cjs'), brs, '--root', dash,
       join(dash, 'roku', 'source', 'game.brs'), join(dash, 'tests', 'solve.brs'), entry]);
@@ -29,16 +35,18 @@ function solve(n) {
     p.stdout.on('data', (d) => { out += d; });
     p.stderr.on('data', (d) => process.stderr.write(d));
     p.on('close', () => {
-      const lines = out.split('\n').filter((l) => /^(STAGE|STUCK) /.test(l));
+      const lines = out.split('\n').filter((l) => /^(STAGE|STAGES|STUCK) /.test(l));
       const stuck = lines.filter((l) => l.startsWith('STUCK'));
-      const stages = lines.filter((l) => l.startsWith('STAGE'));
-      if (stuck.length || stages.length !== 4) {
-        console.log(`level ${n}: FAILED ${stuck.join('; ') || out.trim()}`);
+      const stages = lines.filter((l) => l.startsWith('STAGE '));
+      const count = lines.find((l) => l.startsWith('STAGES '));
+      if (stuck.length || !count || stages.length !== Number(count.split(' ')[1])) {
+        console.log(`${what} ${n}: FAILED ${stuck.join('; ') || out.trim()}`);
         done(false);
         return;
       }
-      writeFileSync(join(dash, 'tests', 'solutions', `${n}.txt`), stages.join('\n') + '\n');
-      console.log(`level ${n}: solved`);
+      writeFileSync(join(dash, 'tests', 'solutions', `${pool ? 'pool' : ''}${n}.txt`),
+        stages.join('\n') + '\n');
+      console.log(`${what} ${n}: solved`);
       done(true);
     });
   });

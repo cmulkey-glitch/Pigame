@@ -15,8 +15,11 @@ the triangle, steered, has none). Each corner is a checkpoint: the camera
 stops, the shape runs into the screen corner and a rocket is built around it (nose cone and
 fins fly in), which blasts up the next side; on the way the shape inside turns into the next
 one, and the rocket parts blow off at the start. A crash sends you back to the start of the current stage. Yellow orbs (press while touching) and jump
-pads appear in ball stages. Ten levels, Easy to Insane; best % per level is saved on the
-device.
+pads appear in ball stages. Ten levels, Easy to Insane. Each level's sides are 22 blocks
+shorter than the last (260 on level 1, 62 on level 10, so it fits inside the one before) and 3%
+faster (1.27 times on level 10): about 100 s for level 1 down to 19 s for level 10, 7 minutes
+for the whole spiral. Saved on the device: best %, and the best time and fewest attempts for
+each level, for the whole spiral and for each random world.
 
 Kids mode (Up / Down on the menu) runs the whole game at 65% speed (`Kids_speed()` in
 `main.brs`). Every jump, flight and flip follows exactly the same path, just slower, so every
@@ -32,12 +35,30 @@ first side, and the run keeps going. At the centre of the spiral, inward from th
 is the core; a spiral run ends by flying into it. Quitting a spiral run saves the
 level it was on, and the menu offers to continue from there.
 
+## Random worlds
+The menu's last row plays a random world: ten levels in a spiral like the classic one, built
+from a seed and named by a five-letter code (24^5, about 8 million). Today's world is the same
+for everyone on a date, so times and attempts can be compared; a new world, and the last world
+played, are the other choices. Each level has the four shapes in a shuffled order, and each side
+is picked from the pool (`roku/pool/0.txt` .. `9.txt`, 16 sides per tier: 4 for each shape,
+from `tools/poolgen.py`) at the level's tier or one either side, then varied:
+- cut short to the level's length (past the cut there is nothing left to hit, so any prefix
+  of a beatable side is beatable);
+- reversed (R), mirrored edge-to-ceiling (M, square and diamond only) or both (B), each
+  kept only if the generator's fairness check passes on it.
+
+So 160 sides give each level 3 tiers x 4 sides x up to 4 variants for each shape, in 24 orders.
+The originals are solved with the real game code like the classic levels; the variants are
+checked with the generator's Python physics only. `World_build` in `world.brs`; the random
+numbers are a seeded LCG (`Rnd` cannot be seeded).
+
 ## Remote
 - OK, Play or Up is the button (ball, diamond). The triangle steers with Left / Right, and the
   square switches sides with Up / Down.
 - `*` or Back pauses: Resume, or Quit to the menu (a spiral run is saved).
 - Menu: Up / Down picks a row, Left / Right changes it, OK starts, Back exits. Rows: the level
-  (OK plays it alone), the speed (Normal / Kids), and the spiral run (continue or new). In a level, Back returns to the menu.
+  (OK plays it alone), the speed (Normal / Kids), the spiral run (continue or new), and the
+  random world (today's, new, or the last one). In a level, Back returns to the menu.
 
 ## Build and sideload
 ```
@@ -67,6 +88,8 @@ on the ceiling side, `_` pad, `o` orb, `.` empty. One character is one block.
 After changing levels or physics, re-solve them with the real game code (a few minutes):
 ```
 node dash/tools/solve.mjs          # -> tests/solutions/N.txt
+python3 dash/tools/poolgen.py      # the random-world pool, ~5 minutes
+node dash/tools/solve.mjs pool     # -> tests/solutions/poolT.txt
 ```
 
 ## Test
@@ -75,11 +98,15 @@ npm install -g brs brighterscript
 node dash/tools/test.mjs
 ```
 Runs `tests/tests.brs` in the brs interpreter: physics checks for each mechanic and for
-checkpoints, then for every stage of every level the stored solution must reach the end and
-never pressing must crash. Then a BrighterScript compile check.
+checkpoints, then for every stage of every level and every side of the pool the stored solution
+must reach the end and never pressing must crash; world codes, seeding and the side variants;
+and a world must build the same from the same code. Then a BrighterScript compile check.
 
 ## Layout
 - `roku/source/game.brs` — level parsing and the 60 Hz physics step, one stage frame for all
   four sides (no Roku objects)
-- `roku/source/main.brs` — turns each stage onto its edge of the screen; remote, menus, sound
-- `tools/levelgen.py`, `tools/solve.mjs` + `tests/solve.brs` — level generation and solving
+- `roku/source/main.brs` — turns each stage onto its edge of the screen; remote, menus,
+  records, sound
+- `roku/source/world.brs` — random worlds from the pool
+- `tools/levelgen.py`, `tools/poolgen.py`, `tools/solve.mjs` + `tests/solve.brs` — level and
+  pool generation and solving

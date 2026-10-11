@@ -2,8 +2,8 @@
 
 ## On-device description
 
-Four shapes, simple controls. Run, fly, flip and zig-zag around every edge of your screen, then
-spiral inward to the next level. 10 levels, checkpoints at every corner, and a Kids mode.
+Four shapes, simple controls. Run, fly, flip and zig-zag around every edge of your screen,
+then spiral inward. 10 levels, millions of random worlds, a world of the day and a Kids mode.
 
 ## Online description
 
@@ -24,9 +24,14 @@ level waiting. Play any level on its own, or take on Spiral mode and travel inwa
 ten in one run. You can pause at any time, and a spiral run is saved when
 you quit, so you can pick it up later.
 
+Want something new? Random worlds build a fresh ten-level spiral from a five-letter code. Play
+today's world (the same for everyone, so you can compare times with friends), roll a new one,
+or replay the last.
+
 - 10 levels, from Easy to Insane
 - 4 shapes, each with its own control
 - Kids mode slows the whole game down without changing the levels
-- Best score saved for every level
+- Millions of random worlds, plus a world of the day
+- Best time and fewest attempts saved for every level, spiral and world
 - Original music and art
 - Plays with your Roku remote: the OK button, plus the arrows for the triangle and the square

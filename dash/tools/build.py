@@ -1,6 +1,7 @@
 """Build the Spiral Shift package: dist/spiral-shift-roku-<version>.zip (sideload or dashboard).
 
-Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt) plus
+Stages dist/spiral-shift-roku/ from dash/roku/ (manifest, source/*.brs, levels/*.txt,
+pool/*.txt) plus
 generated assets:
   images/ball, triangle, square, diamond.png   player frames, 72 px squares (main.brs);
                                                nose, fin.png: rocket parts for the corner animation;
@@ -344,10 +345,10 @@ SONGS = [
 
 def main():
     shutil.rmtree(STAGE, ignore_errors=True)
-    for d in ('source', 'levels', 'images', 'sounds'):
+    for d in ('source', 'levels', 'pool', 'images', 'sounds'):
         os.makedirs(os.path.join(STAGE, d))
     shutil.copy(os.path.join(SRC, 'manifest'), STAGE)
-    for sub, ext in (('source', '.brs'), ('levels', '.txt')):
+    for sub, ext in (('source', '.brs'), ('levels', '.txt'), ('pool', '.txt')):
         for f in sorted(os.listdir(os.path.join(SRC, sub))):
             if f.endswith(ext):
                 shutil.copy(os.path.join(SRC, sub, f), os.path.join(STAGE, sub))

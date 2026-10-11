@@ -1,5 +1,5 @@
 // Run dash/tests/tests.brs (physics checks, and every stage replays its stored solution) against
-// dash/roku/source/game.brs with the brs interpreter, then compile-check dash/roku with
+// dash/roku/source/game.brs and world.brs with the brs interpreter, then compile-check dash/roku with
 // BrighterScript, whose parser matches the device.
 // Needs `npm install -g brs brighterscript`, or BRS= / BSC= paths to the binaries.
 // Usage: node dash/tools/test.mjs
@@ -12,7 +12,8 @@ const root = join(dash, '..');
 const brs = process.env.BRS || spawnSync('which', ['brs'], { encoding: 'utf8' }).stdout.trim();
 // brs-device.cjs wraps brs with the Roku's shared for-each iterator (see that file).
 const r = spawnSync(process.execPath, [join(root, 'tools', 'brs-device.cjs'), brs, '--root', dash,
-  join(dash, 'roku', 'source', 'game.brs'), join(dash, 'tests', 'tests.brs')], { encoding: 'utf8' });
+  join(dash, 'roku', 'source', 'game.brs'), join(dash, 'roku', 'source', 'world.brs'),
+  join(dash, 'tests', 'tests.brs')], { encoding: 'utf8' });
 process.stdout.write(r.stdout || '');
 process.stderr.write(r.stderr || '');
 const bsc = spawnSync(process.env.BSC || 'bsc', ['--root-dir', join(dash, 'roku'), '--create-package', 'false',

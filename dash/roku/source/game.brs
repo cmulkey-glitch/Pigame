@@ -48,11 +48,14 @@ end function
 
 ' Level text: "key=value" header lines, then four stages, each a "---" line followed by its
 ' rows, top (ceiling side) first; the last row of a stage sits on the edge. "." is empty.
+' A "---" line ending ": <mode>" sets that stage's mode (default: Stage_modes() in order);
+' "speed=<multiplier>" in the header scales the run speed (and the diamond's, which matches it).
 function Level_parse(text as string) as object
     lv = { name: "Level", difficulty: "", bg: &h2A3CFFFF, ground: &h1C2BB8FF, line: &hFFFFFFFF
            music: "", width: 0, stages: [], phys: Dash_phys() }
     lines = text.Split(Chr(10))
     groups = []
+    gmodes = []
     rows = invalid
     for i = 0 to lines.Count() - 1
         s = lines[i]
@@ -60,6 +63,10 @@ function Level_parse(text as string) as object
         if Left(s, 3) = "---" then
             rows = []
             groups.Push(rows)
+            gm = ""
+            colon = Instr(1, s, ":")
+            if colon > 0 then gm = Mid(s, colon + 1).Trim()
+            gmodes.Push(gm)
         else if rows <> invalid then
             if s <> "" then rows.Push(s)
         else
@@ -73,6 +80,10 @@ function Level_parse(text as string) as object
                 if k = "bg" then lv.bg = Hex_color(v)
                 if k = "ground" then lv.ground = Hex_color(v)
                 if k = "line" then lv.line = Hex_color(v)
+                if k = "speed" then
+                    lv.phys.speed = lv.phys.speed * Val(v)
+                    lv.phys.wave = lv.phys.wave * Val(v)
+                end if
             end if
         end if
     end for
@@ -80,6 +91,8 @@ function Level_parse(text as string) as object
     for g = 0 to groups.Count() - 1
         st = Strip_parse(groups[g])
         st.mode = modes[g mod 4]
+        if gmodes[g] <> "" then st.mode = gmodes[g]
+        st.phys = lv.phys       ' a random world mixes sides verified at different speeds
         st.start = lv.width
         lv.width = lv.width + st.width
         lv.stages.Push(st)
@@ -170,7 +183,7 @@ end function
 ' Appends "jump", "orb", "pad", "flip", "die", "checkpoint", "win" to r.events.
 sub Run_step(r as object, held as boolean, steer = 0 as integer)
     if r.dead or r.won then return
-    p = r.lv.phys
+    p = r.st.phys
     st = r.st
     mode = r.mode
     if held and not r.held and mode <> "flip" then r.buffer = p.buffer

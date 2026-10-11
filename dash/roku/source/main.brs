@@ -130,6 +130,8 @@ function App_new(screen as object) as object
         screen: screen, screenMain: screen, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, kids: false
         attempts: 0, deadTicks: 0, pause: 0, banner: "", frame: 0, parts: [], trans: invalid
         spiral: false, zoom: invalid, menuRow: 0, spiralNew: false, pauseSel: 0, resumeMode: ""
+        classic: [], random: false, worldCode: "", worldChoice: 0, pool: invalid, ticks: 0
+        result: invalid
         finale: invalid, arrows: {}, arrowTaps: {}
         prev: invalid, roll: 0.0, squash: 0, wasGrounded: true
         jumpDown: false, tapped: false
@@ -147,8 +149,9 @@ function App_new(screen as object) as object
         best: App_best, setBest: App_setBest, spiralSaved: App_spiralSaved, saveSpiral: App_saveSpiral
     }
     for i = 1 to Levels_count()
-        app.levels.Push(Level_parse(ReadAsciiFile("pkg:/levels/" + i.ToStr() + ".txt")))
+        app.classic.Push(Level_parse(ReadAsciiFile("pkg:/levels/" + i.ToStr() + ".txt")))
     end for
+    app.levels = app.classic     ' the levels in play: the classic ones, or a random world's
     app.music.SetLoop(true)
     app.kids = app.reg.Exists("kids") and app.reg.Read("kids") = "1"
 
@@ -242,8 +245,8 @@ function App_key(code as integer) as boolean
     if m.mode = "menu" then
         if code = 0 then return false
         n = m.levels.Count()
-        if code = 2 then m.menuRow = (m.menuRow + 2) mod 3
-        if code = 3 then m.menuRow = (m.menuRow + 1) mod 3
+        if code = 2 then m.menuRow = (m.menuRow + 3) mod 4
+        if code = 3 then m.menuRow = (m.menuRow + 1) mod 4
         if (code = 4 or code = 5) and m.menuRow = 0 then
             if code = 4 then m.sel = (m.sel + n - 1) mod n else m.sel = (m.sel + 1) mod n
         end if
@@ -255,7 +258,14 @@ function App_key(code as integer) as boolean
             m.reg.Flush()
         end if
         if (code = 4 or code = 5) and m.menuRow = 2 then m.spiralNew = not m.spiralNew
+        if (code = 4 or code = 5) and m.menuRow = 3 then
+            choices = World_choices(m)
+            if code = 4 then m.worldChoice = (m.worldChoice + choices.Count() - 1) mod choices.Count()
+            if code = 5 then m.worldChoice = (m.worldChoice + 1) mod choices.Count()
+        end if
         if code = 6 or code = 13 then
+            m.ticks = 0
+            m.result = invalid
             if m.menuRow = 0 then
                 m.spiral = false
                 m.start(m.sel)
@@ -265,6 +275,11 @@ function App_key(code as integer) as boolean
                 if m.spiralNew then from = 0
                 m.attempts = 1
                 m.begin(from, false)
+            else if m.menuRow = 3 then
+                choice = World_choices(m)[m.worldChoice]
+                seed = choice.seed
+                if seed < 0 then seed = World_new_seed()
+                App_world(m, seed)
             end if
         end if
     else if m.mode = "play" then
@@ -291,16 +306,51 @@ function App_key(code as integer) as boolean
             m.quit()
         end if
     else if m.mode = "complete" then
-        if code = 0 or code = 6 or code = 13 then m.mode = "menu"
+        if code = 0 or code = 6 or code = 13 then App_menu(m)
     end if
     return true
 end function
 
-' Leave a level for the menu; a spiral run remembers the level it was on.
+' Leave a level for the menu; a classic spiral run remembers the level it was on.
 sub App_quit()
     m.music.Stop()
-    if m.spiral then m.saveSpiral(m.sel)
-    m.mode = "menu"
+    if m.spiral and not m.random then m.saveSpiral(m.sel)
+    App_menu(m)
+end sub
+
+' Back to the menu, which always shows the classic levels.
+sub App_menu(app as object)
+    if app.random then app.sel = 0
+    app.levels = app.classic
+    app.random = false
+    app.mode = "menu"
+end sub
+
+' The random-world choices on the menu: today's world, a new one, and the last one played.
+' (seed -1: a new seed when chosen)
+function World_choices(app as object) as object
+    daily = World_daily_seed()
+    choices = [{ label: "TODAY'S WORLD " + World_code(daily), seed: daily }, { label: "A NEW WORLD", seed: -1 }]
+    if app.reg.Exists("lastworld") then
+        last = app.reg.Read("lastworld")
+        if last <> World_code(daily) then choices.Push({ label: "LAST WORLD " + last, seed: World_seed(last) })
+    end if
+    return choices
+end function
+
+' Build world `seed` and run it as a spiral from level 1.
+sub App_world(app as object, seed as integer)
+    app.screen.Clear(&h000000FF)
+    Draw_center_at(app.screen, "Building world " + World_code(seed) + "...", 640, 330, &hFFFFFFFF, app.mid)
+    app.screen.SwapBuffers()
+    app.levels = World_build(app, seed)
+    app.random = true
+    app.worldCode = World_code(seed)
+    app.reg.Write("lastworld", app.worldCode)
+    app.reg.Flush()
+    app.spiral = true
+    app.attempts = 1
+    app.begin(0, false)
 end sub
 
 sub App_start(i as integer)
@@ -326,7 +376,7 @@ end sub
 sub App_begin(i as integer, follow as boolean)
     m.lv = m.levels[i]
     m.sel = i
-    m.saveSpiral(i)
+    if not m.random then m.saveSpiral(i)
     m.run = Run_new(m.lv)
     m.prev = invalid
     m.parts = []
@@ -365,6 +415,7 @@ end function
 ' 60 a second, in every mode: animations and timers.
 sub App_tick()
     m.frame = m.frame + 1
+    if m.mode = "play" then m.ticks = m.ticks + 1     ' the run's time, crashes and corners included
     if m.mode = "finale" then
         Finale_tick(m)
         return
@@ -425,7 +476,7 @@ sub App_step()
             m.trans = { t: 0, exit: r.exit, lv: m.lv, sel: m.sel }
             m.wasGrounded = true
         else if e = "win" then
-            m.setBest(m.sel, 100)
+            if not m.random then m.setBest(m.sel, 100)
             if m.spiral and m.sel < m.levels.Count() - 1 then
                 ' the end of a level is a corner like any other: round it into the next one
                 m.sfxCheck.Trigger(90)
@@ -434,9 +485,15 @@ sub App_step()
                 m.begin(m.sel + 1, true)
                 m.trans = { t: 0, exit: r.exit, lv: oldLv, sel: oldSel }
             else if m.spiral then
-                m.saveSpiral(0)
+                if m.random then
+                    App_record(m, "W" + m.worldCode)
+                else
+                    m.saveSpiral(0)
+                    App_record(m, "S")
+                end if
                 Finale_start(m)
             else
+                App_record(m, "L" + m.sel.ToStr())
                 m.music.Stop()
                 m.sfxWin.Trigger(90)
                 m.mode = "complete"
@@ -445,6 +502,54 @@ sub App_step()
     end for
     r.events = []
 end sub
+
+' Records, kept per speed: best time (crashes and corners included) and fewest attempts, for
+' each level ("L<n>"), the classic spiral run ("S") and each random world ("W<code>").
+function Record_get(app as object, key as string) as object
+    k = key
+    if app.kids then k = "k" + key
+    rec = { time: -1.0, attempts: -1 }
+    if app.reg.Exists(k + "t") then rec.time = Val(app.reg.Read(k + "t"))
+    if app.reg.Exists(k + "a") then rec.attempts = app.reg.Read(k + "a").ToInt()
+    return rec
+end function
+
+' Save this finish against the records; app.result says what was beaten, for the end screen.
+sub App_record(app as object, key as string)
+    k = key
+    if app.kids then k = "k" + key
+    time = app.ticks / 60.0
+    old = Record_get(app, key)
+    res = { time: time, attempts: app.attempts, newTime: false, newAttempts: false }
+    if old.time < 0 or time < old.time then
+        app.reg.Write(k + "t", Str(time).Trim())
+        res.newTime = true
+        old.time = time
+    end if
+    if old.attempts < 0 or app.attempts < old.attempts then
+        app.reg.Write(k + "a", app.attempts.ToStr())
+        res.newAttempts = true
+        old.attempts = app.attempts
+    end if
+    app.reg.Flush()
+    res.best = old
+    app.result = res
+end sub
+
+function Fmt_time(sec as float) as string
+    if sec < 0 then return "-"
+    mins = Int(sec / 60)
+    rest = sec - mins * 60
+    tenths = Int(rest * 10)
+    s = Int(tenths / 10).ToStr()
+    if Len(s) < 2 then s = "0" + s
+    return mins.ToStr() + ":" + s + "." + (tenths mod 10).ToStr()
+end function
+
+function Fmt_record(rec as object) as string
+    if rec.time < 0 then return "no record yet"
+    return "best " + Fmt_time(rec.time) + "  /  " + rec.attempts.ToStr() + " attempts"
+end function
 
 ' The triangle's and square's steer from the arrows: the arrow pointing inward on its side
 ' (away from the edge) is 1, the one pointing back at the edge -1. A tap shorter than a game
@@ -1047,8 +1152,9 @@ sub Draw_hud(app as object, r as object)
     s.DrawText(pct, cx + 192, cy - 8, &hFFFFFFFF, app.small)
     info = Shape_info(r.mode)
     Draw_center_at(s, "Stage " + (r.stage + 1).ToStr() + "/4  " + info.name + "  -  " + info.hint, cx, cy + 30, &hFFFFFFC0, app.small)
-    line = "Attempt " + app.attempts.ToStr()
+    line = "Attempt " + app.attempts.ToStr() + "   " + Fmt_time(app.ticks / 60.0)
     if app.spiral then line = "Spiral: level " + (app.sel + 1).ToStr() + "/" + app.levels.Count().ToStr() + "   " + line
+    if app.random then line = "World " + app.worldCode + "   " + line
     if app.kids then line = line + "   (Kids mode)"
     Draw_center_at(s, line, cx, cy + 64, &hFFFFFF90, app.small)
     if app.banner <> "" then Draw_center_at(s, app.banner, cx, cy - 80, info.color, app.big)
@@ -1056,11 +1162,28 @@ sub Draw_hud(app as object, r as object)
     if app.mode = "complete" then
         s.DrawRect(0, 0, 1280, 720, &h00000090)
         title = "LEVEL COMPLETE!"
-        if app.spiral then title = "SPIRAL COMPLETE!"
-        Draw_center_at(s, title, 640, 230, &hFFE14DFF, app.big)
-        Draw_center_at(s, app.lv.name, 640, 330, &hFFFFFFFF, app.mid)
-        Draw_center_at(s, "Attempts: " + app.attempts.ToStr(), 640, 400, &hFFFFFFFF, app.mid)
-        Draw_center_at(s, "Press OK", 640, 520, &hFFFFFFB0, app.small)
+        name = app.lv.name
+        if app.spiral then
+            title = "SPIRAL COMPLETE!"
+            name = "Classic spiral"
+        end if
+        if app.random then
+            title = "WORLD COMPLETE!"
+            name = "World " + app.worldCode
+        end if
+        Draw_center_at(s, title, 640, 200, &hFFE14DFF, app.big)
+        Draw_center_at(s, name, 640, 290, &hFFFFFFFF, app.mid)
+        res = app.result
+        if res <> invalid then
+            t = "Time " + Fmt_time(res.time)
+            if res.newTime then t = t + "   NEW BEST!"
+            a = "Attempts " + res.attempts.ToStr()
+            if res.newAttempts then a = a + "   NEW BEST!"
+            Draw_center_at(s, t, 640, 360, &hFFFFFFFF, app.mid)
+            Draw_center_at(s, a, 640, 420, &hFFFFFFFF, app.mid)
+            Draw_center_at(s, Fmt_record(res.best), 640, 480, &hFFFFFFB0, app.small)
+        end if
+        Draw_center_at(s, "Press OK", 640, 560, &hFFFFFFB0, app.small)
     end if
 end sub
 
@@ -1070,7 +1193,7 @@ sub Draw_center_at(s as object, text as string, cx as integer, y as integer, col
 end sub
 
 ' The menu: the selected level's first side as it starts, the levels after it inward (up the
-' screen); three rows over it: level, speed, spiral run.
+' screen); four rows over it: level, speed, classic spiral run, random world, with records.
 sub Draw_menu(app as object)
     s = app.screen
     lv = app.levels[app.sel]
@@ -1083,12 +1206,13 @@ sub Draw_menu(app as object)
     s.DrawRect(0, 40, 1280, 110, &h00000080)
     Draw_center_at(s, "SPIRAL SHIFT", 640, 58, &hFFFFFFFF, app.big)
 
-    s.DrawRect(200, 226, 880, 190, &h000000B0)
+    s.DrawRect(140, 196, 1000, 300, &h000000B0)
     best = app.best(app.sel)
-    Menu_row(app, 0, "<   Level " + (app.sel + 1).ToStr() + ":  " + lv.name + "  (" + lv.difficulty + ")   best " + best.ToStr() + "%   >", 240)
+    Menu_row(app, 0, "<   Level " + (app.sel + 1).ToStr() + ":  " + lv.name + "  (" + lv.difficulty + ")   " + best.ToStr() + "%   >", 210)
+    Draw_center_at(s, Fmt_record(Record_get(app, "L" + app.sel.ToStr())), 640, 240, &hFFFFFF80, app.small)
     speed = "Speed:   NORMAL   /   kids"
     if app.kids then speed = "Speed:   normal   /   KIDS (slower)"
-    Menu_row(app, 1, speed, 280)
+    Menu_row(app, 1, speed, 284)
     saved = app.spiralSaved()
     row3 = "Spiral run:   all levels in a row, from level 1"
     if saved > 0 then
@@ -1098,8 +1222,16 @@ sub Draw_menu(app as object)
             row3 = "Spiral run:   CONTINUE FROM LEVEL " + (saved + 1).ToStr() + "   /   new run"
         end if
     end if
-    Menu_row(app, 2, row3, 320)
-    Draw_center_at(s, "Up / Down: choose    Left / Right: change    OK: start    Back: exit", 640, 372, &hFFFFFF90, app.small)
+    Menu_row(app, 2, row3, 328)
+    Draw_center_at(s, Fmt_record(Record_get(app, "S")), 640, 358, &hFFFFFF80, app.small)
+    choices = World_choices(app)
+    if app.worldChoice >= choices.Count() then app.worldChoice = 0
+    choice = choices[app.worldChoice]
+    Menu_row(app, 3, "<   Random world:   " + choice.label + "   >", 402)
+    rec = "every play a new spiral"
+    if choice.seed >= 0 then rec = Fmt_record(Record_get(app, "W" + World_code(choice.seed)))
+    Draw_center_at(s, rec, 640, 432, &hFFFFFF80, app.small)
+    Draw_center_at(s, "Up / Down: choose    Left / Right: change    OK: start    Back: exit", 640, 512, &hFFFFFF90, app.small)
 end sub
 
 sub Menu_row(app as object, row as integer, text as string, y as integer)

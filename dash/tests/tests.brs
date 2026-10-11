@@ -1,7 +1,8 @@
 ' Spiral Shift logic tests, run with the brs interpreter by dash/tools/test.mjs.
 ' Physics checks on tiny stages for each mechanic, then for every level and stage: the stored
 ' solution (dash/tests/solutions/N.txt, from dash/tools/solve.mjs) must reach the checkpoint,
-' and never pressing must crash.
+' and never pressing must crash. The same for the random-world pool (dash/roku/pool/T.txt,
+' solutions/poolT.txt), and random worlds must build the same from the same code.
 
 sub Main()
     m.fails = 0
@@ -9,6 +10,10 @@ sub Main()
     for n = 1 to 10
         Test_level(n)
     end for
+    for t = 0 to 9
+        Test_pool(t)
+    end for
+    Test_world()
     if m.fails = 0 then print "ALL PASS" else print m.fails.ToStr() + " FAILED"
 end sub
 
@@ -185,12 +190,21 @@ end sub
 sub Test_level(n as integer)
     lv = Level_parse(ReadAsciiFile("pkg:/roku/levels/" + n.ToStr() + ".txt"))
     Check(lv.stages.Count() = 4, lv.name + ": 4 stages")
-    sols = ReadAsciiFile("pkg:/tests/solutions/" + n.ToStr() + ".txt").Split(Chr(10))
+    Test_stages(lv, ReadAsciiFile("pkg:/tests/solutions/" + n.ToStr() + ".txt").Split(Chr(10)))
+end sub
+
+sub Test_pool(t as integer)
+    lv = Level_parse(ReadAsciiFile("pkg:/roku/pool/" + t.ToStr() + ".txt"))
+    Check(lv.stages.Count() = 16, lv.name + ": 16 sides")
+    Test_stages(lv, ReadAsciiFile("pkg:/tests/solutions/pool" + t.ToStr() + ".txt").Split(Chr(10)))
+end sub
+
+sub Test_stages(lv as object, sols as object)
     for s = 0 to lv.stages.Count() - 1
         what = lv.name + " stage " + (s + 1).ToStr() + " (" + lv.stages[s].mode + ")"
         r = Run_new(lv)
         Run_enter(r, s)
-        frames = Int(lv.stages[s].width / lv.phys.speed) + 20
+        frames = Int(lv.stages[s].width / lv.stages[s].phys.speed) + 20
         for f = 1 to frames
             Run_step(r, false)
             if r.dead or r.stage <> s or r.won then exit for
@@ -218,4 +232,65 @@ function Replay(lv as object, s as integer, sols as object, line as integer) as 
         end for
     end for
     return false
+end function
+
+sub Test_world()
+    Check(World_code(0) = "AAAAA" and World_code(7962623) = "99999", "world codes span 24^5")
+    ok = true
+    for each seed in [1, 4242, 123456, 7962000]
+        if World_seed(World_code(seed)) <> seed then ok = false
+    end for
+    Check(ok, "a world code gives back its seed")
+    rng = Rng_new(99)
+    a = rng.int(1000000)
+    rng = Rng_new(99)
+    Check(rng.int(1000000) = a and Rng_new(100).int(1000000) <> a, "the random numbers follow the seed")
+
+    src = Level_parse("name=t" + Chr(10) + "---: flip" + Chr(10) + "v..................................." + Chr(10) + Empty_rows(8) + "............^#........................").stages[0]
+    o = Strip_variant(src, "O", 30)
+    Check(o.width = 30 and o.cols[12].Count() = 1 and o.cols[12][0].k = "^" and o.cols[19].Count() = 0, "a side is cut short with an empty tail")
+    rv = Strip_variant(src, "R", src.width)
+    hi = src.width - 11
+    Check(rv.cols[12 + hi - 12].Count() = 1 and rv.cols[12 + hi - 13][0].k = "#", "reversed keeps the runway and turns the course around")
+    mi = Strip_variant(src, "M", src.width)
+    Check(mi.cols[12][0].k = "v" and mi.cols[12][0].r = 9 and mi.cols[0][0].k = "^" and mi.cols[0][0].r = 0, "mirrored swaps edge and ceiling")
+
+    app = { classic: [], pool: invalid, poolDir: "pkg:/roku/pool/" }
+    for n = 1 to 10
+        app.classic.Push(Level_parse(ReadAsciiFile("pkg:/roku/levels/" + n.ToStr() + ".txt")))
+    end for
+    w1 = World_build(app, 4242)
+    w2 = World_build(app, 4242)
+    w3 = World_build(app, 4243)
+    same = true
+    differ = false
+    shapes = true
+    widths = true
+    for i = 0 to 9
+        seen = {}
+        for s = 0 to 3
+            a = w1[i].stages[s]
+            b = w2[i].stages[s]
+            if a.mode <> b.mode or World_sig(a) <> World_sig(b) then same = false
+            if a.mode <> w3[i].stages[s].mode or World_sig(a) <> World_sig(w3[i].stages[s]) then differ = true
+            if a.width <> World_width(i) or a.start <> s * World_width(i) then widths = false
+            seen[a.mode] = true
+        end for
+        if seen.Count() <> 4 then shapes = false
+    end for
+    Check(same, "the same code builds the same world")
+    Check(differ, "another code builds another world")
+    Check(shapes, "every world level has all four shapes")
+    Check(widths, "world sides shrink toward the centre like the classic spiral")
+end sub
+
+' The obstacles of a side as a string, to compare sides.
+function World_sig(st as object) as string
+    s = ""
+    for c = 0 to st.cols.Count() - 1
+        for each o in st.cols[c]
+            s = s + c.ToStr() + o.k + o.r.ToStr() + ","
+        end for
+    end for
+    return s
 end function

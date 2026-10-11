@@ -479,11 +479,9 @@ def build_stage(mode, d, length, rng):
                 res = hold_check(trial, state, pos + 2, min_slack, pos - 3)
                 if res is not None:
                     st, state = trial, res[0]
-    # pad the tail so the strip ends a few blocks after the last obstacle
-    end = min(total, pos + TAIL)
-    out = Strip(end)
-    out.cols = st.cols[:end]
-    return out
+    # the strip is exactly `total` long (the spiral's geometry depends on it); empty after the
+    # last pattern
+    return st
 
 
 def stage_ok(st, mode, d):
@@ -511,15 +509,35 @@ LEVELS = [
 DIFFICULTY = ['Easy', 'Easy', 'Normal', 'Normal', 'Hard', 'Hard', 'Harder', 'Harder', 'Insane', 'Insane']
 
 
+# The spiral: each level's sides are one ring (two ring widths, 22 blocks) shorter than the
+# level outside it, so the inner levels' corners line up with the ones you play; and each
+# level is SPEED_STEP faster. The obstacles get harder more gently than before
+# (PATTERN_RAMP), since the speed carries part of the difficulty.
+WIDTH0, WIDTH_STEP, SPEED_STEP, PATTERN_RAMP = 260, 22, 0.03, 0.8
+BASE_SPEED = P['speed']
+
+
+def set_speed(mult):
+    """Scale the run speed (and the diamond's 45-degree speed with it) for one level."""
+    P['speed'] = BASE_SPEED * mult
+    P['wave'] = BASE_SPEED * mult
+
+
+def level_width(i):
+    return WIDTH0 - WIDTH_STEP * i
+
+
 def make_level(i):
     name, bg, ground, line = LEVELS[i]
-    d = i / (len(LEVELS) - 1)
+    d = i / (len(LEVELS) - 1) * PATTERN_RAMP
+    mult = 1 + SPEED_STEP * i
+    set_speed(mult)
     rng = random.Random(1000 + i)
     text = [f'name={name}', f'difficulty={DIFFICULTY[i]}', f'bg={bg}', f'ground={ground}',
-            f'line={line}', f'music=level{i + 1}']
+            f'line={line}', f'music=level{i + 1}', f'speed={mult:.2f}']
     widths = []
     for s, mode in enumerate(MODES):
-        length = round(lerp(110, 170, d)) - (20 if mode in ('fly', 'wave') else 0)
+        length = level_width(i) - RUNWAY - TAIL
         # the patterns were checked one at a time; check the whole stage end to end too
         # (the greedy path can differ) and rebuild it if it fails
         for _ in range(80):
