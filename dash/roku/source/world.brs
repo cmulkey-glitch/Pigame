@@ -2,13 +2,12 @@
 ' dash/tools/poolgen.py) by a seed, so the same code always gives the same world.
 '
 ' Level i has sides World_width(i) long (shorter toward the centre, as in the classic spiral)
-' and its four shapes in a shuffled order. Each side is an original from the pool of the shape,
-' from tier i or a tier either side of it (played at the speed it was verified at), as one of
-' the variants verified for it (O original, R reversed, M mirrored, B both; see poolgen.py),
-' cut to length. Cutting short keeps a side fair: past the cut there is nothing left to hit.
+' and its four shapes in a shuffled order. Each side is one from the pool of the shape, from
+' tier i or a tier either side of it (played at the speed it was solved at), cut to length.
+' Cutting short keeps a side fair: past the cut there is nothing left to hit.
 
 function World_width(i as integer) as integer
-    return 260 - 22 * i         ' as levelgen.py level_width
+    return 260 - 16 * i         ' as levelgen.py level_width
 end function
 
 ' A seedable random number generator (BrightScript's Rnd cannot be seeded): an LCG on
@@ -65,8 +64,7 @@ function World_new_seed() as integer
     return CInt(((dt.AsSeconds() + 0&) * 40503& + Rnd(100000)) mod 7962624&)
 end function
 
-' The pool of tier t, parsed on first use. Each side carries the variants verified for it (the
-' "[...]" in its "---" line).
+' The pool of tier t, parsed on first use.
 function Pool_tier(app as object, t as integer) as object
     if app.pool = invalid then app.pool = {}
     k = t.ToStr()
@@ -74,56 +72,17 @@ function Pool_tier(app as object, t as integer) as object
         dir = "pkg:/pool/"
         if app.poolDir <> invalid then dir = app.poolDir     ' the tests run from dash/
         text = ReadAsciiFile(dir + k + ".txt")
-        lv = Level_parse(text)
-        variants = []
-        for each line in text.Split(Chr(10))
-            if Left(line, 3) = "---" then
-                a = Instr(1, line, "[")
-                b = Instr(1, line, "]")
-                v = "O"
-                if a > 0 and b > a then v = Mid(line, a + 1, b - a - 1)
-                variants.Push(v)
-            end if
-        end for
-        for i = 0 to lv.stages.Count() - 1
-            lv.stages[i].variants = variants[i]
-        end for
-        app.pool[k] = lv
+        app.pool[k] = Level_parse(text)
     end if
     return app.pool[k]
 end function
 
-' A side from the pool as variant v ("O", "R", "M" or "B"), cut to width (keeping the empty
-' tail at its end).
-function Strip_variant(src as object, v as string, width as integer) as object
+' A side from the pool cut to width, keeping an empty tail (levelgen.py TAIL = 10) at its end.
+function Strip_cut(src as object, width as integer) as object
     st = { h: 10, width: width, cols: [], mode: src.mode, phys: src.phys }
-    rev = (v = "R" or v = "B")
-    mir = (v = "M" or v = "B")
-    lo = 12                     ' the runway (levelgen.py RUNWAY) stays in front
-    hi = src.width - 11         ' the last column before the source's tail (TAIL = 10)
-    last = width - 11           ' and this one's
+    last = width - 11
     for c = 0 to width - 1
-        col = []
-        if c <= last then
-            s = c
-            if rev and c >= lo and c <= hi then s = lo + hi - c
-            srcCol = src.cols[s]
-            for i = 0 to srcCol.Count() - 1
-                o = srcCol[i]
-                r = o.r
-                k = o.k
-                if mir then
-                    r = 9 - r
-                    if k = "^" then
-                        k = "v"
-                    else if k = "v" then
-                        k = "^"
-                    end if
-                end if
-                col.Push({ k: k, r: r, id: c.ToStr() + "_" + r.ToStr() })
-            end for
-        end if
-        st.cols.Push(col)
+        if c <= last then st.cols.Push(src.cols[c]) else st.cols.Push([])
     end for
     return st
 end function
@@ -156,8 +115,7 @@ function World_build(app as object, seed as integer) as object
             cands = World_candidates(Pool_tier(app, t), mode, w)
             if cands.Count() = 0 then cands = World_candidates(Pool_tier(app, i), mode, w)
             src = cands[rng.int(cands.Count())]
-            v = Mid(src.variants, rng.int(Len(src.variants)) + 1, 1)
-            st = Strip_variant(src, v, w)
+            st = Strip_cut(src, w)
             st.start = lv.width
             lv.width = lv.width + w
             lv.stages.Push(st)

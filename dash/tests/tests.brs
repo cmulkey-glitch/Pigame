@@ -195,7 +195,7 @@ end sub
 
 sub Test_pool(t as integer)
     lv = Level_parse(ReadAsciiFile("pkg:/roku/pool/" + t.ToStr() + ".txt"))
-    Check(lv.stages.Count() = 16, lv.name + ": 16 sides")
+    Check(lv.stages.Count() = 48, lv.name + ": 48 sides")
     Test_stages(lv, ReadAsciiFile("pkg:/tests/solutions/pool" + t.ToStr() + ".txt").Split(Chr(10)))
 end sub
 
@@ -246,14 +246,9 @@ sub Test_world()
     rng = Rng_new(99)
     Check(rng.int(1000000) = a and Rng_new(100).int(1000000) <> a, "the random numbers follow the seed")
 
-    src = Level_parse("name=t" + Chr(10) + "---: flip" + Chr(10) + "v..................................." + Chr(10) + Empty_rows(8) + "............^#........................").stages[0]
-    o = Strip_variant(src, "O", 30)
-    Check(o.width = 30 and o.cols[12].Count() = 1 and o.cols[12][0].k = "^" and o.cols[19].Count() = 0, "a side is cut short with an empty tail")
-    rv = Strip_variant(src, "R", src.width)
-    hi = src.width - 11
-    Check(rv.cols[12 + hi - 12].Count() = 1 and rv.cols[12 + hi - 13][0].k = "#", "reversed keeps the runway and turns the course around")
-    mi = Strip_variant(src, "M", src.width)
-    Check(mi.cols[12][0].k = "v" and mi.cols[12][0].r = 9 and mi.cols[0][0].k = "^" and mi.cols[0][0].r = 0, "mirrored swaps edge and ceiling")
+    src = Level_parse("name=t" + Chr(10) + "---: flip" + Chr(10) + "............^...........^.............").stages[0]
+    o = Strip_cut(src, 30)
+    Check(o.width = 30 and o.mode = "flip" and o.cols[12].Count() = 1 and o.cols[24].Count() = 0, "a side is cut short with an empty tail")
 
     app = { classic: [], pool: invalid, poolDir: "pkg:/roku/pool/" }
     for n = 1 to 10

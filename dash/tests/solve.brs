@@ -91,11 +91,18 @@ function Solve_path(t as object) as string
     return out
 end function
 
-sub Solve_level(path as string)
+' Every stage of the file, or only those listed in `only` ("3,17"; "" for all).
+sub Solve_level(path as string, only as string)
     lv = Level_parse(ReadAsciiFile(path))
+    pick = {}
+    for each s in only.Split(",")
+        if s <> "" then pick[s] = true
+    end for
     for s = 0 to lv.stages.Count() - 1
-        sol = Solve_stage(lv, s)
-        if sol <> invalid then print "STAGE " + s.ToStr() + " " + sol.ToStr()    ' ToStr: brs cannot concatenate it as returned
+        if pick.Count() = 0 or pick.DoesExist(s.ToStr()) then
+            sol = Solve_stage(lv, s)
+            if sol <> invalid then print "STAGE " + s.ToStr() + " " + sol.ToStr()    ' ToStr: brs cannot concatenate it as returned
+        end if
     end for
     print "STAGES " + lv.stages.Count().ToStr()
 end sub

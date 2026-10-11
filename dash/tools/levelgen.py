@@ -15,10 +15,11 @@ fairly from where the previous pattern left the player:
 Patterns that fail are swapped for another; the seed makes the output repeatable.
 
 The physics here is a Python copy of Run_step, used for design only (float64 vs the device's
-float32 can differ by a hair). dash/tools/solve.mjs then solves every stage with the real
-BrightScript code and dash/tools/test.mjs replays those solutions, so a drift shows up there.
+float32 can differ by a hair). dash/tools/pysolve.py then solves every stage with an exact copy
+of the BrightScript arithmetic and dash/tools/test.mjs replays those solutions with the real
+code, so a drift shows up there.
 
-Usage: python3 dash/tools/levelgen.py            (then: node dash/tools/solve.mjs)
+Usage: python3 dash/tools/levelgen.py            (then: python3 dash/tools/pysolve.py)
 """
 import math
 import multiprocessing
@@ -509,11 +510,12 @@ LEVELS = [
 DIFFICULTY = ['Easy', 'Easy', 'Normal', 'Normal', 'Hard', 'Hard', 'Harder', 'Harder', 'Insane', 'Insane']
 
 
-# The spiral: each level's sides are one ring (two ring widths, 22 blocks) shorter than the
-# level outside it, so the inner levels' corners line up with the ones you play; and each
+# The spiral: each level's sides are WIDTH_STEP blocks shorter than the level outside it (less
+# than the 22 that two ring widths would take, so level 10 still lasts about half a minute;
+# the inner rings drawn beyond the ceiling just crop a little more of the course), and each
 # level is SPEED_STEP faster. The obstacles get harder more gently than before
 # (PATTERN_RAMP), since the speed carries part of the difficulty.
-WIDTH0, WIDTH_STEP, SPEED_STEP, PATTERN_RAMP = 260, 22, 0.03, 0.8
+WIDTH0, WIDTH_STEP, SPEED_STEP, PATTERN_RAMP = 260, 16, 0.03, 0.8
 BASE_SPEED = P['speed']
 
 

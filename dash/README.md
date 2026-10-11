@@ -15,10 +15,10 @@ the triangle, steered, has none). Each corner is a checkpoint: the camera
 stops, the shape runs into the screen corner and a rocket is built around it (nose cone and
 fins fly in), which blasts up the next side; on the way the shape inside turns into the next
 one, and the rocket parts blow off at the start. A crash sends you back to the start of the current stage. Yellow orbs (press while touching) and jump
-pads appear in ball stages. Ten levels, Easy to Insane. Each level's sides are 22 blocks
-shorter than the last (260 on level 1, 62 on level 10, so it fits inside the one before) and 3%
-faster (1.27 times on level 10): about 100 s for level 1 down to 19 s for level 10, 7 minutes
-for the whole spiral. Saved on the device: best %, and the best time and fewest attempts for
+pads appear in ball stages. Ten levels, Easy to Insane. Each level's sides are 16 blocks
+shorter than the last (260 on level 1, 116 on level 10, so it fits inside the one before) and 3%
+faster (1.27 times on level 10): about 100 s for level 1 down to 35 s for level 10, about 10
+minutes for the whole spiral. Saved on the device: best %, and the best time and fewest attempts for
 each level, for the whole spiral and for each random world.
 
 Kids mode (Up / Down on the menu) runs the whole game at 65% speed (`Kids_speed()` in
@@ -40,16 +40,11 @@ The menu's last row plays a random world: ten levels in a spiral like the classi
 from a seed and named by a five-letter code (24^5, about 8 million). Today's world is the same
 for everyone on a date, so times and attempts can be compared; a new world, and the last world
 played, are the other choices. Each level has the four shapes in a shuffled order, and each side
-is picked from the pool (`roku/pool/0.txt` .. `9.txt`, 16 sides per tier: 4 for each shape,
-from `tools/poolgen.py`) at the level's tier or one either side, then varied:
-- cut short to the level's length (past the cut there is nothing left to hit, so any prefix
-  of a beatable side is beatable);
-- reversed (R), mirrored edge-to-ceiling (M, square and diamond only) or both (B), each
-  kept only if the generator's fairness check passes on it.
-
-So 160 sides give each level 3 tiers x 4 sides x up to 4 variants for each shape, in 24 orders.
-The originals are solved with the real game code like the classic levels; the variants are
-checked with the generator's Python physics only. `World_build` in `world.brs`; the random
+is picked from the pool (`roku/pool/0.txt` .. `9.txt`, 48 sides per tier: 12 for each shape,
+from `tools/poolgen.py`) at the level's tier or one either side, and cut short to the level's
+length (past the cut there is nothing left to hit, so any prefix of a beatable side is
+beatable). So each level has 36 sides to pick from for each shape, in 24 orders, and every
+side is solved with the real game code like the classic levels. `World_build` in `world.brs`; the random
 numbers are a seeded LCG (`Rnd` cannot be seeded).
 
 ## Remote
@@ -85,21 +80,26 @@ Level files are plain text and can be edited by hand: header lines, then four `-
 each 10 rows (inner ceiling first, edge last). `#` block, `^` spike on the edge side, `v` spike
 on the ceiling side, `_` pad, `o` orb, `.` empty. One character is one block.
 
-After changing levels or physics, re-solve them with the real game code (a few minutes):
+After changing levels or physics, solve them again (`tools/pysolve.py`: the search in
+`tests/solve.brs` over a Python copy of `Run_step` that rounds every float operation as the brs
+interpreter does, ~100 times faster than brs itself). The tests replay every solution with the
+real game code; a stage whose replay fails is re-solved with the real code by `solve.mjs`:
 ```
-node dash/tools/solve.mjs          # -> tests/solutions/N.txt
-python3 dash/tools/poolgen.py      # the random-world pool, ~5 minutes
-node dash/tools/solve.mjs pool     # -> tests/solutions/poolT.txt
+python3 dash/tools/pysolve.py              # -> tests/solutions/N.txt, ~2 minutes
+python3 dash/tools/poolgen.py              # the random-world pool, ~10 minutes
+python3 dash/tools/pysolve.py pool         # -> tests/solutions/poolT.txt, ~15 minutes
+node dash/tools/solve.mjs [pool] N:stage   # only if a replay fails (slow: ~10 min a side)
 ```
+If you change `Run_step`, change `pysolve.py`'s copy to match.
 
 ## Test
 ```
 npm install -g brs brighterscript
 node dash/tools/test.mjs
 ```
-Runs `tests/tests.brs` in the brs interpreter: physics checks for each mechanic and for
+Runs `tests/tests.brs` in the brs interpreter (about 10 minutes): physics checks for each mechanic and for
 checkpoints, then for every stage of every level and every side of the pool the stored solution
-must reach the end and never pressing must crash; world codes, seeding and the side variants;
+must reach the end and never pressing must crash; world codes, seeding and cutting sides short;
 and a world must build the same from the same code. Then a BrighterScript compile check.
 
 ## Layout
@@ -108,5 +108,5 @@ and a world must build the same from the same code. Then a BrighterScript compil
 - `roku/source/main.brs` — turns each stage onto its edge of the screen; remote, menus,
   records, sound
 - `roku/source/world.brs` — random worlds from the pool
-- `tools/levelgen.py`, `tools/poolgen.py`, `tools/solve.mjs` + `tests/solve.brs` — level and
-  pool generation and solving
+- `tools/levelgen.py`, `tools/poolgen.py`, `tools/pysolve.py`, `tools/solve.mjs` +
+  `tests/solve.brs` — level and pool generation and solving
