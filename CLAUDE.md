@@ -1,7 +1,7 @@
 # Project notes for Claude
 
-The active project is **Spiral Shift**, a Roku game in `dash/` (read `dash/README.md` first: it
-covers the design, every tool and the file layout). The rest of the repository is older work: a
+The active project is **Spiral Shift**, a Roku game in `dash/`. Read `dash/README.md` (how it
+works, every tool, the file layout) and `dash/NOTES.md` (why it is this way, known issues, to-do). The rest of the repository is older work: a
 Downland port (`roku/`, `src/`, `tools/` except `tools/brs-device.cjs`) that must not be sold.
 
 ## The game in brief
