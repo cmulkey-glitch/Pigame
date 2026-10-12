@@ -98,7 +98,10 @@ sub Deep_link(app as object, info as dynamic)
     if contentId = invalid or mediaType = invalid then return
     if Left(contentId, 5) = "level" then
         n = Mid(contentId, 6).ToInt()
-        if n >= 1 and n <= app.levels.Count() and app.mode = "menu" then app.sel = n - 1
+        if n >= 1 and n <= app.levels.Count() and app.mode = "menu" then
+            app.sel = n - 1
+            app.menuRow = 0
+        end if
     end if
 end sub
 
@@ -138,7 +141,7 @@ function App_new(port as object) as object
     app = {
         port: port, screen: invalid, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, easy: false
         attempts: 0, deadTicks: 0, pause: 0, banner: "", bannerHold: 0, frame: 0, parts: [], trans: invalid
-        spiral: false, zoom: invalid, menuRow: 0, spiralNew: false, pauseSel: 0, resumeMode: ""
+        spiral: false, zoom: invalid, menuRow: 2, spiralNew: false, pauseSel: 0, resumeMode: ""
         classic: [], random: false, worldCode: "", worldChoice: 0, pool: invalid, ticks: 0
         result: invalid
         finale: invalid, arrows: {}, arrowTaps: {}
@@ -153,6 +156,7 @@ function App_new(port as object) as object
         big: fonts.GetDefaultFont(64, true, false)
         mid: fonts.GetDefaultFont(40, true, false)
         small: fonts.GetDefaultFont(26, false, false)
+        label: fonts.GetDefaultFont(32, true, false)
         key: App_key, tick: App_tick, step: App_step, running: App_running, draw: App_draw
         start: App_start, begin: App_begin, respawn: App_respawn, quit: App_quit
         best: App_best, setBest: App_setBest, spiralSaved: App_spiralSaved, saveSpiral: App_saveSpiral
@@ -276,8 +280,16 @@ function App_key(code as integer) as boolean
     if m.mode = "menu" then
         if code = 0 then return false
         n = m.levels.Count()
-        if code = 2 then m.menuRow = (m.menuRow + 3) mod 4
-        if code = 3 then m.menuRow = (m.menuRow + 1) mod 4
+        if code = 2 or code = 3 then
+            ' up and down the cards as shown (Menu_order)
+            order = Menu_order()
+            i = 0
+            while order[i] <> m.menuRow
+                i = i + 1
+            end while
+            if code = 2 then i = (i + 3) mod 4 else i = (i + 1) mod 4
+            m.menuRow = order[i]
+        end if
         if (code = 4 or code = 5) and m.menuRow = 0 then
             if code = 4 then m.sel = (m.sel + n - 1) mod n else m.sel = (m.sel + 1) mod n
         end if
@@ -364,10 +376,10 @@ end sub
 ' (seed -1: a new seed when chosen)
 function World_choices(app as object) as object
     daily = World_daily_seed()
-    choices = [{ label: "TODAY'S WORLD " + World_code(daily), seed: daily }, { label: "A NEW WORLD", seed: -1 }]
+    choices = [{ label: "today's world  " + World_code(daily), seed: daily }, { label: "a new world, every time", seed: -1 }]
     if app.reg.Exists("lastworld") then
         last = app.reg.Read("lastworld")
-        if last <> World_code(daily) then choices.Push({ label: "LAST WORLD " + last, seed: World_seed(last) })
+        if last <> World_code(daily) then choices.Push({ label: "the last world played  " + last, seed: World_seed(last) })
     end if
     return choices
 end function
@@ -1260,8 +1272,13 @@ sub Draw_center_at(s as object, text as string, cx as integer, y as integer, col
     s.DrawText(text, Int(cx - w / 2), y, color, font)
 end sub
 
-' The menu: the selected level's first side as it starts, the levels after it inward (up the
-' screen); four rows over it: level, speed, classic spiral run, random world, with records.
+' The menu: the selected level's first side as it starts, dimmed, behind the title (the four
+' shapes either side of it, bobbing) and four cards in Menu_order: icon, name, what OK starts
+' (Left / Right change it on the selected card) and the record to beat.
+function Menu_order() as object
+    return [2, 3, 0, 1]     ' spiral run, random world, single level, speed (menuRow values)
+end function
+
 sub Draw_menu(app as object)
     s = app.screen
     lv = app.levels[app.sel]
@@ -1271,42 +1288,109 @@ sub Draw_menu(app as object)
     Draw_stage(app, 0, st, st.mode, camX)
     p = View_rect(0, 0, 0, 1, 1, camX)
     Draw_shape(app, st.mode, 0, 0, p.x + 24, p.y + 24, 1.0)
-    s.DrawRect(0, 40, 1280, 110, &h00000080)
-    Draw_center_at(s, "SPIRAL SHIFT", 640, 58, &hFFFFFFFF, app.big)
+    s.DrawRect(0, 0, 1280, 720, &h00000070)
 
-    s.DrawRect(140, 196, 1000, 300, &h000000B0)
-    best = app.best(app.sel)
-    Menu_row(app, 0, "<   Level " + (app.sel + 1).ToStr() + ":  " + lv.name + "  (" + lv.difficulty + ")   " + best.ToStr() + "%   >", 210)
-    Draw_center_at(s, Fmt_record(Record_get(app, "L" + app.sel.ToStr())), 640, 240, &hFFFFFF80, app.small)
-    speed = "Speed:   NORMAL   /   easy"
-    if app.easy then speed = "Speed:   normal   /   EASY (slower)"
-    Menu_row(app, 1, speed, 284)
-    saved = app.spiralSaved()
-    row3 = "Spiral run:   all layers in a row, from layer 1"
-    if saved > 0 then
-        if app.spiralNew then
-            row3 = "Spiral run:   continue from layer " + (saved + 1).ToStr() + "   /   NEW RUN"
-        else
-            row3 = "Spiral run:   CONTINUE FROM LAYER " + (saved + 1).ToStr() + "   /   new run"
-        end if
-    end if
-    Menu_row(app, 2, row3, 328)
-    Draw_center_at(s, Fmt_record(Record_get(app, "S")), 640, 358, &hFFFFFF80, app.small)
-    choices = World_choices(app)
-    if app.worldChoice >= choices.Count() then app.worldChoice = 0
-    choice = choices[app.worldChoice]
-    Menu_row(app, 3, "<   Random world:   " + choice.label + "   >", 402)
-    rec = "every play a new spiral"
-    if choice.seed >= 0 then rec = Fmt_record(Record_get(app, "W" + World_code(choice.seed)))
-    Draw_center_at(s, rec, 640, 432, &hFFFFFF80, app.small)
-    Draw_center_at(s, "Up / Down: choose    Left / Right: change    OK: start    Back: exit", 640, 512, &hFFFFFF90, app.small)
+    ' title
+    Draw_center_at(s, "SPIRAL SHIFT", 644, 40, &h00000090, app.big)
+    Draw_center_at(s, "SPIRAL SHIFT", 640, 36, &hFFFFFFFF, app.big)
+    w = app.big.GetOneLineWidth("SPIRAL SHIFT", 1280)
+    modes = Stage_modes()
+    xs = [640 - w / 2 - 150, 640 - w / 2 - 66, 640 + w / 2 + 66, 640 + w / 2 + 150]
+    for i = 0 to 3
+        bob = 5 * Sin(app.frame / 14.0 + i * 1.6)
+        Draw_shape(app, modes[i], 0, 0, xs[i], 72 + bob, 1.1)
+    end for
+    Draw_center_at(s, "run the edges  -  shift your shape  -  spiral inward", 640, 116, &hFFFFFFA0, app.small)
+
+    ' cards
+    order = Menu_order()
+    for i = 0 to 3
+        Menu_card(app, order[i], 160 + i * 104)
+    end for
+    Draw_center_at(s, "Up / Down  choose        Left / Right  change        OK  start        Back  exit", 640, 594, &hFFFFFF80, app.small)
 end sub
 
-sub Menu_row(app as object, row as integer, text as string, y as integer)
-    color = &hFFFFFF90
-    if row = app.menuRow then
-        color = &hFFE14DFF
-        app.screen.DrawRect(220, y + 4, 8, 24, &hFFE14DFF)
+' One menu card at y (88 high): icon, name, value and record.
+sub Menu_card(app as object, row as integer, y as integer)
+    s = app.screen
+    on = (row = app.menuRow)
+    x = 200
+    w = 880
+    accent = &hFFE14DFF
+    if on then
+        s.DrawRect(x - 3, y - 3, w + 6, 94, accent)
+        s.DrawRect(x, y, w, 88, &h1A1F3CF0)
+    else
+        s.DrawRect(x, y, w, 88, &h0B0E1CC8)
     end if
-    Draw_center_at(app.screen, text, 640, y, color, app.small)
+
+    rec = invalid
+    if row = 2 then
+        name = "SPIRAL RUN"
+        icon = "core"
+        saved = app.spiralSaved()
+        value = "all 10 layers, from layer 1"
+        if saved > 0 then
+            if app.spiralNew then value = "new run, from layer 1" else value = "continue from layer " + (saved + 1).ToStr()
+        end if
+        rec = Record_get(app, "S")
+        sw = saved > 0
+    else if row = 3 then
+        name = "RANDOM WORLD"
+        icon = "flip"
+        choices = World_choices(app)
+        if app.worldChoice >= choices.Count() then app.worldChoice = 0
+        choice = choices[app.worldChoice]
+        value = choice.label
+        if choice.seed >= 0 then rec = Record_get(app, "W" + World_code(choice.seed))
+        sw = true
+    else if row = 0 then
+        lv = app.levels[app.sel]
+        name = "SINGLE LEVEL"
+        icon = "jump"
+        value = (app.sel + 1).ToStr() + ".  " + lv.name + "   (" + lv.difficulty + ")"
+        rec = Record_get(app, "L" + app.sel.ToStr())
+        sw = true
+    else
+        name = "SPEED"
+        icon = "fly"
+        value = "normal"
+        if app.easy then value = "easy  (everything at 65% speed)"
+        sw = true
+    end if
+
+    ' icon
+    if icon = "core" then
+        k = 0.36
+        s.DrawScaledObject(Int(x + 48 - 96 * k), Int(y + 44 - 96 * k), k, k, app.img.core)
+    else
+        Draw_shape(app, icon, 0, 0, x + 48, y + 44, 0.8)
+    end if
+
+    nameColor = &hFFFFFFB0
+    valueColor = &hFFFFFFD0
+    if on then
+        nameColor = accent
+        valueColor = &hFFFFFFFF
+    end if
+    s.DrawText(name, x + 100, y + 10, nameColor, app.label)
+    vx = x + 100
+    if on and sw then
+        s.DrawText("<", vx, y + 50, accent, app.small)
+        vx = vx + 26
+    end if
+    s.DrawText(value, vx, y + 50, valueColor, app.small)
+    if on and sw then s.DrawText(">", vx + app.small.GetOneLineWidth(value, 800) + 12, y + 50, accent, app.small)
+
+    ' the record to beat, right-aligned on the name row
+    if rec <> invalid then
+        if rec.time < 0 then
+            t = ""
+            if on then t = "no record yet"
+        else
+            t = "best " + Fmt_time(rec.time) + "   " + rec.attempts.ToStr() + " tries"
+        end if
+        if row = 0 and app.best(app.sel) > 0 then t = "best " + app.best(app.sel).ToStr() + "%    " + t
+        s.DrawText(t, x + w - 20 - app.small.GetOneLineWidth(t, 600), y + 14, &hFFFFFF90, app.small)
+    end if
 end sub

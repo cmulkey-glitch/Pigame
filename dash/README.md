@@ -54,9 +54,9 @@ numbers are a seeded LCG (`Rnd` cannot be seeded).
   random world can put them). Each corner shows the new shape and its arrows for two seconds,
   and the HUD always does.
 - `*` or Back pauses: Resume, or Quit to the menu (a spiral run is saved).
-- Menu: Up / Down picks a row, Left / Right changes it, OK starts, Back exits. Rows: the level
-  (OK plays it alone), the speed (Normal / Easy), the spiral run (continue or new), and the
-  random world (today's, new, or the last one). In a level, Back returns to the menu.
+- Menu: Up / Down picks a card, Left / Right changes it, OK starts, Back exits. Cards: the
+  spiral run (continue or new), the random world (today's, new, or the last one), a single level,
+  and the speed (Normal / Easy), each with its record. In a level, Back returns to the menu.
 
 ## Build and sideload
 ```
