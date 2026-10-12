@@ -21,10 +21,10 @@
 ' side one ring in. At the centre of the spiral is the core (Draw_rings); a spiral run ends by
 ' flying into it (Finale_*).
 '
-' Remote: OK, Play or any arrow is the button (jump / zig-zag; see game.brs); the arrows steer
-' the triangle and switch the square's side (App_steer); * or Back
-' pauses (Resume / Quit). Menu: Up / Down pick a row (level, speed, spiral run, random world),
-' Left / Right change it, OK starts, Back exits.
+' Remote: OK or any arrow is the button (jump / zig-zag; see game.brs); the arrows steer the
+' triangle and switch the square's side (App_steer); Back or Play/Pause pauses (Resume / Quit;
+' not *, which Roku keeps for its own options). Menu: Up / Down pick a card (spiral run, single
+' level, speed, random world), Left / Right change it, OK starts, Back exits.
 
 function Levels_count() as integer
     return 10
@@ -264,12 +264,12 @@ end sub
 
 ' Returns false to quit the channel.
 function App_key(code as integer) as boolean
-    ' the button: OK, Play, or any arrow (the ball and diamond take whichever is handy, wherever
-    ' they are; the triangle and square read the arrows as steering instead, App_steer)
-    isJump = (code = 6 or code = 13 or (code >= 2 and code <= 5))
+    ' the button: OK or any arrow (the ball and diamond take whichever is handy, wherever they
+    ' are; the triangle and square read the arrows as steering instead, App_steer)
+    isJump = (code = 6 or (code >= 2 and code <= 5))
     if code >= 100 then
         c = code - 100
-        if c = 6 or c = 13 then m.jumpDown = false
+        if c = 6 then m.jumpDown = false
         m.arrows.Delete(c.ToStr())
         return true
     end if
@@ -326,8 +326,8 @@ function App_key(code as integer) as boolean
             end if
         end if
     else if m.mode = "play" then
-        if code = 0 or code = 10 then
-            ' Back or *: pause
+        if code = 0 or code = 13 then
+            ' Back or Play/Pause: pause
             m.resumeMode = m.mode
             m.mode = "paused"
             m.pauseSel = 0
@@ -340,12 +340,12 @@ function App_key(code as integer) as boolean
         end if
     else if m.mode = "paused" then
         if code = 2 or code = 3 then m.pauseSel = 1 - m.pauseSel
-        if code = 0 or code = 10 or ((code = 6 or code = 13) and m.pauseSel = 0) then
+        if code = 0 or code = 13 or (code = 6 and m.pauseSel = 0) then
             m.mode = m.resumeMode
             m.jumpDown = false
             m.tapped = false
             if m.mode = "play" then m.music.Resume()
-        else if (code = 6 or code = 13) and m.pauseSel = 1 then
+        else if code = 6 and m.pauseSel = 1 then
             m.quit()
         end if
     else if m.mode = "complete" then
@@ -903,7 +903,7 @@ sub Draw_pause(app as object)
             Draw_center_at(s, items[i], 640, y + 12, &hFFFFFFB0, app.label)
         end if
     end for
-    Draw_center_at(s, "*  or  Back  resumes", 640, 470, &hFFFFFF80, app.small)
+    Draw_center_at(s, "Back  or  Play/Pause  resumes", 640, 470, &hFFFFFF80, app.small)
 end sub
 
 ' A panel like the menu's cards: dark, with a yellow border when it has the focus.

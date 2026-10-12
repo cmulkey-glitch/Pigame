@@ -48,12 +48,13 @@ side is solved with the real game code like the classic levels. `World_build` in
 numbers are a seeded LCG (`Rnd` cannot be seeded).
 
 ## Remote
-- OK, Play or any arrow is the button (ball, diamond), wherever they are. The triangle steers and the square switches
+- OK or any arrow is the button (ball, diamond), wherever they are. The triangle steers and the square switches
   sides with the arrows toward and away from the edge being run along: Left / Right on the
   right and left sides (as in the classic levels), Up / Down on the bottom and top (where a
   random world can put them). Each corner shows the new shape and its arrows for two seconds,
   and the HUD always does.
-- `*` or Back pauses: Resume, or Quit to the menu (a spiral run is saved).
+- Back or Play/Pause pauses: Resume, or Quit to the menu (a spiral run is saved). Not `*`:
+  Roku keeps it for its own options menu.
 - Menu: Up / Down picks a card, Left / Right changes it, OK starts, Back exits. Cards: the
   spiral run (continue or new), the random world (today's, new, or the last one), a single level,
   and the speed (Normal / Easy), each with its record. In a level, Back returns to the menu.

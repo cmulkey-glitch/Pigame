@@ -34,9 +34,9 @@ sub Scenario(app as object)
 
     ' paused
     app.mode = "play"
-    app.key(10)
+    app.key(0)
     Shot(app, "21-paused")
-    app.key(10)
+    app.key(0)
 
     ' a corner: the ball runs into it and the rocket takes it up the right side
     r = app.run
