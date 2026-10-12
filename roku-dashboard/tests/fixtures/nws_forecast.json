@@ -1,0 +1,82 @@
+{
+ "properties": {
+  "periods": [
+   {
+    "number": 1,
+    "name": "Columbus Day",
+    "startTime": "2026-10-12T08:00:00-04:00",
+    "endTime": "2026-10-12T18:00:00-04:00",
+    "isDaytime": true,
+    "temperature": 71,
+    "temperatureUnit": "F",
+    "temperatureTrend": null,
+    "probabilityOfPrecipitation": {
+     "unitCode": "wmoUnit:percent",
+     "value": 3
+    },
+    "windSpeed": "7 to 15 mph",
+    "windDirection": "N",
+    "icon": "https://api.weather.gov/icons/land/day/sct?size=medium",
+    "shortForecast": "Mostly Sunny",
+    "detailedForecast": "Mostly sunny, with a high near 71. North wind 7 to 15 mph."
+   },
+   {
+    "number": 2,
+    "name": "Tonight",
+    "startTime": "2026-10-12T18:00:00-04:00",
+    "endTime": "2026-10-13T06:00:00-04:00",
+    "isDaytime": false,
+    "temperature": 61,
+    "temperatureUnit": "F",
+    "temperatureTrend": null,
+    "probabilityOfPrecipitation": {
+     "unitCode": "wmoUnit:percent",
+     "value": 2
+    },
+    "windSpeed": "3 to 9 mph",
+    "windDirection": "NW",
+    "icon": "https://api.weather.gov/icons/land/night/few?size=medium",
+    "shortForecast": "Mostly Clear",
+    "detailedForecast": "Mostly clear, with a low around 61. Northwest wind 3 to 9 mph."
+   },
+   {
+    "number": 3,
+    "name": "Tuesday",
+    "startTime": "2026-10-13T06:00:00-04:00",
+    "endTime": "2026-10-13T18:00:00-04:00",
+    "isDaytime": true,
+    "temperature": 72,
+    "temperatureUnit": "F",
+    "temperatureTrend": null,
+    "probabilityOfPrecipitation": {
+     "unitCode": "wmoUnit:percent",
+     "value": 2
+    },
+    "windSpeed": "3 to 12 mph",
+    "windDirection": "S",
+    "icon": "https://api.weather.gov/icons/land/day/sct?size=medium",
+    "shortForecast": "Mostly Sunny",
+    "detailedForecast": "Mostly sunny, with a high near 72. South wind 3 to 12 mph."
+   },
+   {
+    "number": 4,
+    "name": "Tuesday Night",
+    "startTime": "2026-10-13T18:00:00-04:00",
+    "endTime": "2026-10-14T06:00:00-04:00",
+    "isDaytime": false,
+    "temperature": 68,
+    "temperatureUnit": "F",
+    "temperatureTrend": null,
+    "probabilityOfPrecipitation": {
+     "unitCode": "wmoUnit:percent",
+     "value": 7
+    },
+    "windSpeed": "13 mph",
+    "windDirection": "SW",
+    "icon": "https://api.weather.gov/icons/land/night/sct?size=medium",
+    "shortForecast": "Partly Cloudy",
+    "detailedForecast": "Partly cloudy, with a low around 68. Southwest wind around 13 mph."
+   }
+  ]
+ }
+}

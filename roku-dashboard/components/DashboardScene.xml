@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The screensaver. 1920x1080 (ui_resolutions=fhd). Everything inside "content" drifts a few
+     pixels each minute for burn-in protection; the backgrounds stay put. -->
+<component name="DashboardScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/DashboardScene.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/dates.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/feeds.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/weather.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/settings.brs" />
+    <children>
+        <Rectangle id="bgSolid" width="1920" height="1080" color="0x0B1622FF" />
+        <!-- Portrait photos: a dim, low-res copy fills the frame behind the fitted photo. -->
+        <Poster id="bgFill" width="1920" height="1080" loadDisplayMode="scaleToZoom"
+            loadWidth="480" loadHeight="270" opacity="0" />
+        <Poster id="bg" width="1920" height="1080" loadDisplayMode="scaleToFit"
+            loadWidth="1920" loadHeight="1080" opacity="0" />
+        <Poster id="shade" width="1920" height="1080" uri="pkg:/images/shade.png" />
+
+        <Group id="content">
+            <Label id="clock" translation="[120,70]" height="260" vertAlign="bottom" color="0xFFFFFFFF">
+                <Font role="font" uri="font:BoldSystemFontFile" size="220" />
+            </Label>
+            <Label id="ampm" translation="[120,212]" color="0xFFFFFFCC">
+                <Font role="font" uri="font:SystemFontFile" size="56" />
+            </Label>
+            <Label id="date" translation="[128,340]" color="0xFFFFFFE6">
+                <Font role="font" uri="font:SystemFontFile" size="54" />
+            </Label>
+
+            <Group id="weather" translation="[1100,96]">
+                <Poster id="wxIcon" translation="[564,10]" width="136" height="136" />
+                <Label id="wxTemp" width="540" horizAlign="right" color="0xFFFFFFFF">
+                    <Font role="font" uri="font:BoldSystemFontFile" size="120" />
+                </Label>
+                <Label id="wxText" translation="[0,150]" width="700" horizAlign="right" color="0xFFFFFFE6">
+                    <Font role="font" uri="font:SystemFontFile" size="38" />
+                </Label>
+                <Label id="wxPlace" translation="[0,200]" width="700" horizAlign="right" color="0xFFFFFF99">
+                    <Font role="font" uri="font:SystemFontFile" size="30" />
+                </Label>
+                <LayoutGroup id="wxPeriods" translation="[700,262]" layoutDirection="horiz"
+                    horizAlignment="right" itemSpacings="[24]" />
+            </Group>
+
+            <Group id="holiday" translation="[120,520]" visible="false">
+                <Label id="holidayKicker" text="TODAY IS" color="0xFFC857FF">
+                    <Font role="font" uri="font:BoldSystemFontFile" size="30" />
+                </Label>
+                <Label id="holidayName" translation="[0,40]" width="1500" color="0xFFFFFFFF">
+                    <Font role="font" uri="font:BoldSystemFontFile" size="66" />
+                </Label>
+                <Label id="holidayCount" translation="[0,124]" color="0xFFFFFF99">
+                    <Font role="font" uri="font:SystemFontFile" size="28" />
+                </Label>
+            </Group>
+
+            <Rectangle id="alertBar" translation="[120,690]" width="1680" height="92"
+                color="0xB3261EEE" visible="false">
+                <Label id="alertText" translation="[32,0]" width="1616" height="92" vertAlign="center"
+                    color="0xFFFFFFFF">
+                    <Font role="font" uri="font:BoldSystemFontFile" size="40" />
+                </Label>
+            </Rectangle>
+
+            <Label id="tickerSource" translation="[120,830]" color="0xFFC857FF">
+                <Font role="font" uri="font:BoldSystemFontFile" size="28" />
+            </Label>
+            <Label id="tickerText" translation="[120,868]" width="1680" wrap="true" maxLines="2"
+                lineSpacing="4" color="0xFFFFFFFF">
+                <Font role="font" uri="font:SystemFontFile" size="44" />
+            </Label>
+            <Label id="credit" translation="[1000,990]" width="800" horizAlign="right" color="0xFFFFFF80">
+                <Font role="font" uri="font:SystemFontFile" size="22" />
+            </Label>
+        </Group>
+
+        <Rectangle id="dim" width="1920" height="1080" color="0x000000FF" opacity="0" />
+
+        <Timer id="clockTimer" repeat="true" duration="1" />
+        <Timer id="minuteTimer" repeat="true" duration="60" />
+        <Timer id="rotateTimer" repeat="true" duration="12" />
+    </children>
+</component>

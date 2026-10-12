@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><feed
+	xmlns="http://www.w3.org/2005/Atom"
+	xmlns:thr="http://purl.org/syndication/thread/1.0"
+	xml:lang="en-US"
+	>
+	<title type="text">The Verge</title>
+	<subtitle type="text">The Verge is about technology and how it makes us feel. Founded in 2011, we offer our audience everything from breaking news to reviews to award-winning features and investigations, on our site, in video, and in podcasts.</subtitle>
+
+	<updated>2026-10-12T16:52:54+00:00</updated>
+
+	<link rel="alternate" type="text/html" href="https://www.theverge.com" />
+	<id>https://www.theverge.com/rss/index.xml</id>
+	<link rel="self" type="application/atom+xml" href="https://www.theverge.com/rss/index.xml" />
+
+	<icon>https://platform.theverge.com/wp-content/uploads/sites/2/2025/01/verge-rss-large_80b47e.png?w=150&amp;h=150&amp;crop=1</icon>
+		<entry>
+			
+			<author>
+				<name>Robert Hart</name>
+			</author>
+			
+			<title type="html"><![CDATA[Meta has some Wonder Full new AI models ]]></title>
+			<link rel="alternate" type="text/html" href="https://www.theverge.com/ai-artificial-intelligence/1009479/meta-muse-wonder-full-ai-model" />
+			<id>https://www.theverge.com/?p=1009479</id>
+			<updated>2026-10-12T07:13:10-04:00</updated>
+			<published>2026-10-12T13:00:00-04:00</published>
+			<category scheme="https://www.theverge.com" term="AI" /><category scheme="https://www.theverge.com" term="Meta" /><category scheme="https://www.theverge.com" term="News" /><category scheme="https://www.theverge.com" term="Tech" />
+							<summary type="html"><![CDATA[Meta is making up for lost time in the AI race. After launching Muse Spark, the first model from its revamped Superintelligence Labs division, and buzzy AI agent Muse, it's now launching two new models it claims can go toe-to-toe with the industry's best. The new models, Muse Wonder and Muse Wonder Full, are available [&#8230;]]]></summary>
+			
+							<content type="html">
+											<![CDATA[
+
+						
+<figure>
+
+<img alt="" data-caption="" data-portal-copyright="Image: The Verge, Getty Images, Meta" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/10/STKB394_MUSE_AI_CVIRGINIA_D.png?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+<p class="wp-block-paragraph">Meta is making up for lost time in the AI race. After <a href="https://www.theverge.com/tech/908769/meta-muse-spark-ai-model-launch-rollout">launching Muse Spark</a>, the first model from its <a href="https://www.theverge.com/ai-artificial-intelligence/703929/meta-openai-anthropic-superintelligence-lab-ai-poaching-money">revamped</a> Superintelligence Labs division, and <a href="https://www.theverge.com/ai-artificial-intelligence/991216/meta-bets-on-ai-agent-muse-to-catch-up-in-ai-race">buzzy AI agent Muse</a>, it's now <a href="https://research.meta.ai/blog/introducing-muse-wonder">launching</a> two new models it claims can go toe-to-toe with the industry's best. </p>
+<p class="wp-block-paragraph">The new models, Muse Wonder and Muse Wonder Full, are available for Muse Code subscribers starting today. Wonder can also be accessed through the Meta Model API, Meta said. </p>
+<p class="wp-block-paragraph">Meta says it eventually plans to power its Muse AI agent with Wonder, starting with subscribers, and will develop specialized models it "can bring to everyone using Muse." It hasn't shared specifics or provided a tim …</p>
+<p><a href="https://www.theverge.com/ai-artificial-intelligence/1009479/meta-muse-wonder-full-ai-model">Read the full story at The Verge.</a></p>
+						]]>
+									</content>
+			
+					</entry>
+			<entry>
+			
+			<author>
+				<name>Jess Weatherbed</name>
+			</author>
+			
+			<title type="html"><![CDATA[Elon Musk has donated over $276 million to Republican midterm efforts]]></title>
+			<link rel="alternate" type="text/html" href="https://www.theverge.com/tech/1009604/elon-musk-2026-midterm-republican-donations" />
+			<id>https://www.theverge.com/?p=1009604</id>
+			<updated>2026-10-12T12:52:54-04:00</updated>
+			<published>2026-10-12T12:52:54-04:00</published>
+			<category scheme="https://www.theverge.com" term="Elon Musk" /><category scheme="https://www.theverge.com" term="News" /><category scheme="https://www.theverge.com" term="Policy" /><category scheme="https://www.theverge.com" term="Politics" /><category scheme="https://www.theverge.com" term="Tech" />
+							<summary type="html"><![CDATA[Elon Musk has handed out at least $276 million to Republican groups since July, The New York Times reports, making him both the party's top known donor and the biggest established midterm donor. $158 million of that money - one of the largest political donations in American history - has been funneled into the Senate [&#8230;]]]></summary>
+			
+							<content type="html">
+											<![CDATA[
+
+						
+<figure>
+
+<img alt="Elon Musk and Donald Trump, superimposed over static" data-caption="So much for doing less political spending. | Image: Cath Virginia / The Verge, Getty Images" data-portal-copyright="Image: Cath Virginia / The Verge, Getty Images" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2025/02/STK175_STK022_DONALD_TRUMP_ELON_MUSK_CVIRGINIA_A.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+	So much for doing less political spending. | Image: Cath Virginia / The Verge, Getty Images	</figcaption>
+</figure>
+<p class="wp-block-paragraph">Elon Musk has handed out at least $276 million to Republican groups since July, <a href="https://www.nytimes.com/2026/10/12/us/politics/elon-musk-midterms.html?unlocked_article_code=1.IFE.aLC7.pvHMc8gKt-Fv&amp;smid=nytcore-ios-share"><em>The New York Times</em></a> reports, making him both the party's top known donor and the biggest established midterm donor. $158 million of that money - one of the largest political donations in American history - has been funneled into the Senate Leadership Fund, the main super PAC that aims to secure and maintain a Republican Senate majority. Among others, it's fighting to retain the party's Senate seat in Texas, which serves as a major hub for Musk's business empire.</p>
+<p class="wp-block-paragraph">He's also donated over $76 million to America PAC, a super PAC Musk founded in 2024 that canvasses for …</p>
+<p><a href="https://www.theverge.com/tech/1009604/elon-musk-2026-midterm-republican-donations">Read the full story at The Verge.</a></p>
+						]]>
+									</content>
+			
+					</entry>
+			<entry>
+			
+			<author>
+				<name>Jess Weatherbed</name>
+			</author>
+			
+			<title type="html"><![CDATA[The Yandex outage probably didn’t blitz Russian bots]]></title>
+			<link rel="alternate" type="text/html" href="https://www.theverge.com/tech/1009594/russian-bots-yandex-outage-drone-strikes-debunk" />
+			<id>https://www.theverge.com/?p=1009594</id>
+			<updated>2026-10-12T11:43:07-04:00</updated>
+			<published>2026-10-12T11:43:07-04:00</published>
+			<category scheme="https://www.theverge.com" term="News" /><category scheme="https://www.theverge.com" term="Policy" /><category scheme="https://www.theverge.com" term="Politics" /><category scheme="https://www.theverge.com" term="Security" /><category scheme="https://www.theverge.com" term="Social Media" /><category scheme="https://www.theverge.com" term="Tech" /><category scheme="https://www.theverge.com" term="Web" />
+							<summary type="html"><![CDATA[Multiple Ukrainian drone strikes over the last week have taken Russian data centers offline and reportedly caused online bot traffic to plummet - but in reality it's probably not the kind of bot activity most people associate with Russia. A chart citing Cloudflare data has been circulating around social media platforms, showing a sharp decline [&#8230;]]]></summary>
+			
+							<content type="html">
+											<![CDATA[
+
+						
+<figure>
+
+<img alt="Person’s hands holding a phone screen with a trippy spiral background." data-caption="" data-portal-copyright="Image: Cath Virginia / The Verge, Getty Images" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/09/STKS536_AI_HALLUCINATION_C.png?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+<p class="wp-block-paragraph">Multiple <a href="https://www.bbc.co.uk/news/articles/cw0k0g57mk3zo">Ukrainian drone strikes</a> over the last week have taken Russian data centers offline and reportedly caused online bot traffic to plummet - but in reality it's probably not the kind of bot activity most people associate with Russia.</p>
+<p class="wp-block-paragraph">A <a href="https://www.tomshardware.com/tech-industry/data-centers/russian-disinformation-bot-traffic-nearly-eliminated-overnight-after-ukraine-drone-strikes-cripple-multiple-of-russias-google-data-centers-ukraine-intensifies-bombing-of-yandex-data-centers-in-response-to-moscows-strikes-on-kyiv-data-centers">chart citing Cloudflare data</a> has been circulating around social media platforms, showing <a href="https://radar.cloudflare.com/traffic/as13238">a sharp decline</a> in bot traffic following attacks on Yandex servers - a technology company often described as "Russia's Google." While many people are inferring that the chart refers to bot farms that <a href="https://www.theverge.com/2024/7/9/24195228/doj-bot-farm-rt-russian-government-namecheap">push disinformation</a>, conspiracy theories, and <a href="https://www.theverge.com/2018/2/16/17021684/facebook-twitter-mueller-russia-troll-factory">other harmful content</a> across online platforms, reputed troll farm expose …</p>
+<p><a href="https://www.theverge.com/tech/1009594/russian-bots-yandex-outage-drone-strikes-debunk">Read the full story at The Verge.</a></p>
+						]]>
+									</content>
+			
+					</entry>
+	</feed>

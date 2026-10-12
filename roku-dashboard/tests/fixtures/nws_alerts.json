@@ -1,0 +1,39 @@
+{
+ "features": [
+  {
+   "properties": {
+    "event": "Flood Warning",
+    "severity": "Severe",
+    "headline": "Flood Warning issued October 12 at 10:35AM CDT by NWS Lake Charles LA"
+   }
+  },
+  {
+   "properties": {
+    "event": "Coastal Flood Advisory",
+    "severity": "Minor",
+    "headline": "Coastal Flood Advisory issued October 12 at 9:24AM CDT until October 13 at 1:00AM CDT by NWS Corpus Christi TX"
+   }
+  },
+  {
+   "properties": {
+    "event": "Rip Current Statement",
+    "severity": "Moderate",
+    "headline": "Rip Current Statement issued October 12 at 5:06AM CDT until October 12 at 7:00PM CDT by NWS Houston/Galveston TX"
+   }
+  },
+  {
+   "properties": {
+    "event": "Tornado Warning",
+    "severity": "Extreme",
+    "headline": "Synthetic: most severe sorts first"
+   }
+  },
+  {
+   "properties": {
+    "event": "Special Weather Statement",
+    "severity": "Minor",
+    "headline": "Synthetic: dropped"
+   }
+  }
+ ]
+}

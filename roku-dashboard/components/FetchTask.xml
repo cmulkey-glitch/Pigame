@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Network + parsing off the render thread. Set kind and params, then control = "run";
+     the parsed result arrives in result as {kind, ok, data}. One instance per request. -->
+<component name="FetchTask" extends="Task">
+    <interface>
+        <field id="kind" type="string" />
+        <field id="params" type="assocarray" />
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/FetchTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/dates.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/feeds.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/weather.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/potd.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/settings.brs" />
+</component>

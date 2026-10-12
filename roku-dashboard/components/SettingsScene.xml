@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Change screensaver settings" (RunScreenSaverSettings). Every change saves immediately. -->
+<component name="SettingsScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/SettingsScene.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/dates.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/feeds.brs" />
+    <script type="text/brightscript" uri="pkg:/source/lib/settings.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0x0B1622FF" />
+        <Label id="title" translation="[160,90]" text="Living Room Dashboard" color="0xFFFFFFFF">
+            <Font role="font" uri="font:BoldSystemFontFile" size="60" />
+        </Label>
+        <Label id="hint" translation="[160,980]" width="1600" color="0xFFFFFF99"
+            text="OK to change  ·  Back to finish" font="font:SmallSystemFont" />
+
+        <LabelList id="menu" translation="[160,220]" itemSize="[1200,76]" itemSpacing="[0,8]"
+            color="0xFFFFFFCC" focusedColor="0x0B1622FF" />
+
+        <Group id="checkPane" visible="false">
+            <Label id="checkTitle" translation="[160,200]" color="0xFFC857FF" font="font:MediumBoldSystemFont" />
+            <CheckList id="checks" translation="[160,270]" itemSize="[1000,72]" itemSpacing="[0,6]"
+                color="0xFFFFFFCC" focusedColor="0x0B1622FF" />
+        </Group>
+    </children>
+</component>
