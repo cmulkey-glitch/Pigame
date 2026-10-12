@@ -212,11 +212,18 @@ def poster(w, h):
     sp = spike().resize((size // 2, size // 2), Image.LANCZOS)
     for i in range(3):
         img.alpha_composite(sp, (int(W * 0.42) + i * size // 2, Hh - e - size // 2))
-    # the name, if a bold font is available (DejaVu ships with most Linux systems)
-    try:
-        font = ImageFont.truetype('DejaVuSans-Bold.ttf', int(Hh * 0.115))
-    except OSError:
-        font = None
+    # the name, in the first bold font found: DejaVu (most Linux), Arial or Segoe (Windows),
+    # Helvetica / Arial (macOS)
+    font = None
+    for name in ('DejaVuSans-Bold.ttf', 'arialbd.ttf', 'segoeuib.ttf', 'Arial Bold.ttf',
+                 '/System/Library/Fonts/Supplemental/Arial Bold.ttf'):
+        try:
+            font = ImageFont.truetype(name, int(Hh * 0.115))
+            break
+        except OSError:
+            pass
+    if font is None:
+        print('warning: no bold font found; the icons and splash have no title')
     if font:
         text = 'SPIRAL SHIFT'
         tw = d.textlength(text, font=font)
