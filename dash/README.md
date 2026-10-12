@@ -63,8 +63,8 @@ numbers are a seeded LCG (`Rnd` cannot be seeded).
 ```
 pip install pillow lameenc
 python3 dash/tools/build.py        # -> dist/spiral-shift-roku-<version>.zip
-(On Windows the command is `python`, not `python3`.)
 ```
+On Windows the command is `python`, not `python3`.
 Enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, Right), open
 `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press Install.
 
