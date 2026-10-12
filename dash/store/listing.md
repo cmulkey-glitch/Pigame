@@ -3,7 +3,7 @@
 ## On-device description
 
 Four shapes, simple controls. Run, fly, flip and zig-zag around every edge of your screen,
-then spiral inward. 10 levels, millions of random worlds, a world of the day and a Kids mode.
+then spiral inward. 10 levels, millions of random worlds, a world of the day and an Easy mode.
 
 ## Online description
 
@@ -31,7 +31,7 @@ you're on: the game shows you which ones at every corner.
 
 - 10 levels, from Easy to Insane
 - 4 shapes, each with its own control
-- Kids mode slows the whole game down without changing the levels
+- Easy mode slows the whole game down without changing the levels
 - Millions of random worlds, plus a world of the day
 - Best time and fewest attempts saved for every level, spiral and world
 - Original music and art

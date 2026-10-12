@@ -10,6 +10,10 @@ generated assets:
   sounds/level1-10.mp3                         8-bar chiptune loops; die, complete, rocket,
                                                checkpoint.wav
 
+With --ads: the ad-supported build instead, dist/spiral-shift-ads-roku-<version>.zip, a separate
+channel: source/ads.brs from dash/roku-ads/ (Roku Advertising Framework at natural breaks) and
+the manifest lines in dash/roku-ads/manifest.extra.
+
 Also writes the store listing artwork (poster 540 x 405, splash 1920 x 1080) to dist/store/.
 
 Needs Pillow and lameenc (pip install pillow lameenc). Usage: python3 dash/tools/build.py
@@ -21,6 +25,7 @@ import random
 import shutil
 import struct
 import wave
+import sys
 import zipfile
 
 import lameenc
@@ -28,6 +33,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, '..', 'roku')
+ADS = os.path.join(HERE, '..', 'roku-ads')
 DIST = os.path.join(HERE, '..', '..', 'dist')
 STAGE = os.path.join(DIST, 'spiral-shift-roku')
 SS = 4          # supersampling for smooth edges
@@ -344,16 +350,22 @@ SONGS = [
 
 
 def main():
-    shutil.rmtree(STAGE, ignore_errors=True)
+    ads = '--ads' in sys.argv[1:]
+    stage = STAGE + ('-ads' if ads else '')
+    shutil.rmtree(stage, ignore_errors=True)
     for d in ('source', 'levels', 'pool', 'images', 'sounds'):
-        os.makedirs(os.path.join(STAGE, d))
-    shutil.copy(os.path.join(SRC, 'manifest'), STAGE)
+        os.makedirs(os.path.join(stage, d))
+    shutil.copy(os.path.join(SRC, 'manifest'), stage)
     for sub, ext in (('source', '.brs'), ('levels', '.txt'), ('pool', '.txt')):
         for f in sorted(os.listdir(os.path.join(SRC, sub))):
             if f.endswith(ext):
-                shutil.copy(os.path.join(SRC, sub, f), os.path.join(STAGE, sub))
+                shutil.copy(os.path.join(SRC, sub, f), os.path.join(stage, sub))
+    if ads:
+        shutil.copy(os.path.join(ADS, 'ads.brs'), os.path.join(stage, 'source', 'ads.brs'))
+        with open(os.path.join(stage, 'manifest'), 'a') as fh:
+            fh.write(open(os.path.join(ADS, 'manifest.extra')).read())
 
-    img = lambda name: os.path.join(STAGE, 'images', name)
+    img = lambda name: os.path.join(stage, 'images', name)
     sheet(ball_frames(), 18).save(img('ball.png'))
     sheet(stage_frames(triangle(), range(-40, 45, 5)), 17).save(img('triangle.png'))
     sheet([turned(square(), -a) for a in range(0, 90, 5)], 18).save(img('square.png'))
@@ -380,7 +392,7 @@ def main():
     poster(540, 405).convert('RGB').save(os.path.join(store, 'poster_540x405.png'))
     poster(1920, 1080).convert('RGB').save(os.path.join(store, 'splash_1920x1080.png'))
 
-    snd = lambda name: os.path.join(STAGE, 'sounds', name)
+    snd = lambda name: os.path.join(stage, 'sounds', name)
     for i, (bpm, chords, lead) in enumerate(SONGS):
         write_mp3(snd(f'level{i + 1}.mp3'), song(bpm, chords, lead, i + 1))
     write_wav(snd('die.wav'), sfx_die())
@@ -391,12 +403,12 @@ def main():
     # the version in the name, so an older download is never uploaded by mistake
     man = dict(l.split('=', 1) for l in open(os.path.join(SRC, 'manifest')).read().split('\n') if '=' in l)
     version = f"{man['major_version']}.{man['minor_version']}.{man['build_version']}"
-    out = os.path.join(DIST, f'spiral-shift-roku-{version}.zip')
+    out = os.path.join(DIST, f"spiral-shift-{'ads-' if ads else ''}roku-{version}.zip")
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
-        for base, _, files in os.walk(STAGE):
+        for base, _, files in os.walk(stage):
             for f in sorted(files):
                 path = os.path.join(base, f)
-                z.write(path, os.path.relpath(path, STAGE))
+                z.write(path, os.path.relpath(path, stage))
     print(f'wrote {os.path.relpath(out)} ({os.path.getsize(out)} bytes)')
 
 

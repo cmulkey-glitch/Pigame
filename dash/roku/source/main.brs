@@ -12,7 +12,7 @@
 ' rocket around it that flies up the next side, turning it into the next shape on the way.
 '
 ' Two clocks: ticks at 60 a second drive menus, particles and animations; game steps
-' (Run_step) run at 60 a second too, or slower in Kids mode (KIDS_SPEED), which slows the whole
+' (Run_step) run at 60 a second too, or slower in Easy mode (Easy_speed), which slows the whole
 ' game down without changing any path through it. Frames are drawn between game steps.
 '
 ' The spiral: the levels after the one being played lie inward of it, one ring (Ring_rows) per
@@ -30,18 +30,15 @@ function Levels_count() as integer
     return 10
 end function
 
-function Kids_speed() as float
+function Easy_speed() as float
     return 0.65
 end function
 
 ' args: launch parameters (deep links); the game has no content to link to, so it opens the menu.
 sub Main(args as dynamic)
     port = CreateObject("roMessagePort")
-    screen = CreateObject("roScreen", true, 1280, 720)
-    screen.SetMessagePort(port)
-    screen.SetAlphaEnable(true)
-
-    app = App_new(screen)
+    app = App_new(port)
+    Ads_init(app)
     Deep_link(app, args)
     Memory_watch(port)
     ' deep links while running (supports_input_launch in the manifest): accepted, nothing to open
@@ -77,7 +74,7 @@ sub Main(args as dynamic)
             app.tick()
         end while
         stepMs = tickMs
-        if app.kids then stepMs = tickMs / Kids_speed()
+        if app.easy then stepMs = tickMs / Easy_speed()
         if app.running() then
             gacc = gacc + dt
             while gacc >= stepMs
@@ -88,7 +85,7 @@ sub Main(args as dynamic)
             gacc = 0
         end if
         app.draw(gacc / stepMs)
-        screen.SwapBuffers()
+        app.screen.SwapBuffers()
     end while
 end sub
 
@@ -124,10 +121,22 @@ sub App_low_memory(app as object)
     app.parts = []
 end sub
 
-function App_new(screen as object) as object
+' The display: a double-buffered roScreen on the app's port. Let go (every reference dropped)
+' while something else must show, such as an ad (ads.brs), and made again after.
+sub App_screen_new(app as object)
+    app.screen = CreateObject("roScreen", true, 1280, 720)
+    app.screen.SetMessagePort(app.port)
+    app.screen.SetAlphaEnable(true)
+end sub
+
+sub App_screen_release(app as object)
+    app.screen = invalid
+end sub
+
+function App_new(port as object) as object
     fonts = CreateObject("roFontRegistry")
     app = {
-        screen: screen, screenMain: screen, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, kids: false
+        port: port, screen: invalid, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, easy: false
         attempts: 0, deadTicks: 0, pause: 0, banner: "", bannerHold: 0, frame: 0, parts: [], trans: invalid
         spiral: false, zoom: invalid, menuRow: 0, spiralNew: false, pauseSel: 0, resumeMode: ""
         classic: [], random: false, worldCode: "", worldChoice: 0, pool: invalid, ticks: 0
@@ -148,12 +157,13 @@ function App_new(screen as object) as object
         start: App_start, begin: App_begin, respawn: App_respawn, quit: App_quit
         best: App_best, setBest: App_setBest, spiralSaved: App_spiralSaved, saveSpiral: App_saveSpiral
     }
+    App_screen_new(app)
     for i = 1 to Levels_count()
         app.classic.Push(Level_parse(ReadAsciiFile("pkg:/levels/" + i.ToStr() + ".txt")))
     end for
     app.levels = app.classic     ' the levels in play: the classic ones, or a random world's
     app.music.SetLoop(true)
-    app.kids = app.reg.Exists("kids") and app.reg.Read("kids") = "1"
+    app.easy = app.reg.Exists("kids") and app.reg.Read("kids") = "1"
 
     app.img = { orb: CreateObject("roBitmap", "pkg:/images/orb.png") }
     for s = 0 to 3
@@ -212,10 +222,10 @@ function Shape_keys(mode as string, stage as integer) as string
     return "LEFT / RIGHT"
 end function
 
-' Best % per level, kept separately for Kids mode.
+' Best % per level, kept separately for Easy mode (registry keys "k...": it was Kids mode).
 function App_best(i as integer) as integer
     k = "best" + i.ToStr()
-    if m.kids then k = "kbest" + i.ToStr()
+    if m.easy then k = "kbest" + i.ToStr()
     if m.reg.Exists(k) then return m.reg.Read(k).ToInt()
     return 0
 end function
@@ -223,7 +233,7 @@ end function
 sub App_setBest(i as integer, pct as integer)
     if pct > m.best(i) then
         k = "best" + i.ToStr()
-        if m.kids then k = "kbest" + i.ToStr()
+        if m.easy then k = "kbest" + i.ToStr()
         m.reg.Write(k, pct.ToStr())
         m.reg.Flush()
     end if
@@ -232,14 +242,14 @@ end sub
 ' Spiral run progress (the level to continue from), kept per speed.
 function App_spiralSaved() as integer
     k = "spiral"
-    if m.kids then k = "kspiral"
+    if m.easy then k = "kspiral"
     if m.reg.Exists(k) then return m.reg.Read(k).ToInt()
     return 0
 end function
 
 sub App_saveSpiral(i as integer)
     k = "spiral"
-    if m.kids then k = "kspiral"
+    if m.easy then k = "kspiral"
     if i <= 0 then
         m.reg.Delete(k)
     else
@@ -272,9 +282,9 @@ function App_key(code as integer) as boolean
             if code = 4 then m.sel = (m.sel + n - 1) mod n else m.sel = (m.sel + 1) mod n
         end if
         if (code = 4 or code = 5 or code = 6 or code = 13) and m.menuRow = 1 then
-            m.kids = not m.kids
+            m.easy = not m.easy
             v = "0"
-            if m.kids then v = "1"
+            if m.easy then v = "1"
             m.reg.Write("kids", v)
             m.reg.Flush()
         end if
@@ -327,7 +337,10 @@ function App_key(code as integer) as boolean
             m.quit()
         end if
     else if m.mode = "complete" then
-        if code = 0 or code = 6 or code = 13 then App_menu(m)
+        if code = 0 or code = 6 or code = 13 then
+            App_menu(m)
+            Ads_break(m)
+        end if
     end if
     return true
 end function
@@ -456,6 +469,12 @@ sub App_tick()
         p.vx = p.vx * p.drag
         p.vy = p.vy * p.drag
         p.life = p.life - 1
+        if p.frames <> invalid then
+            ' a shard tumbles (steps through its shape's frames) and shrinks away at the end
+            n = p.frames.Count()
+            p.f = ((p.f + p.spin) mod n + n) mod n
+            if p.life < 20 then p.k = p.k0 * p.life / 20.0
+        end if
         if p.life > 0 then alive.Push(p)
     end for
     m.parts = alive
@@ -471,7 +490,7 @@ sub App_tick()
     end if
 end sub
 
-' One game step (slower in Kids mode).
+' One game step (slower in Easy mode).
 sub App_step()
     r = m.run
     m.prev = { x: r.x, y: r.y, stage: r.stage }
@@ -492,12 +511,21 @@ sub App_step()
         if e = "die" then
             m.sfxDie.Trigger(90)
             m.setBest(m.sel, Int(Run_progress(r) * 100))
+            ' the shape bursts into small copies of itself, tumbling out, and a few sparks
             c = Player_center(r, r.x, r.y)
-            color = Shape_info(r.mode).color
-            for i = 1 to 30
+            info = Shape_info(r.mode)
+            frames = m.sheets[info.sheet]
+            for i = 1 to 14
                 a = Rnd(0) * 6.283
-                s = 2 + Rnd(0) * 10
-                Spark(m, c.x, c.y, Cos(a) * s, Sin(a) * s, 6 + Rnd(10), color, 60)
+                s = 3 + Rnd(0) * 9
+                k = 0.25 + Rnd(0) * 0.3
+                m.parts.Push({ x: c.x, y: c.y, vx: Cos(a) * s, vy: Sin(a) * s, life: 60, drag: 0.95
+                               frames: frames, f: Rnd(frames.Count()) - 1, spin: 3 - 2 * Rnd(2), k: k, k0: k })
+            end for
+            for i = 1 to 12
+                a = Rnd(0) * 6.283
+                s = 2 + Rnd(0) * 8
+                Spark(m, c.x, c.y, Cos(a) * s, Sin(a) * s, 4 + Rnd(5), info.color, 40)
             end for
         else if e = "checkpoint" then
             m.sfxCheck.Trigger(90)
@@ -535,7 +563,7 @@ end sub
 ' each level ("L<n>"), the classic spiral run ("S") and each random world ("W<code>").
 function Record_get(app as object, key as string) as object
     k = key
-    if app.kids then k = "k" + key
+    if app.easy then k = "k" + key
     rec = { time: -1.0, attempts: -1 }
     if app.reg.Exists(k + "t") then rec.time = Val(app.reg.Read(k + "t"))
     if app.reg.Exists(k + "a") then rec.attempts = app.reg.Read(k + "a").ToInt()
@@ -545,7 +573,7 @@ end function
 ' Save this finish against the records; app.result says what was beaten, for the end screen.
 sub App_record(app as object, key as string)
     k = key
-    if app.kids then k = "k" + key
+    if app.easy then k = "k" + key
     time = app.ticks / 60.0
     old = Record_get(app, key)
     res = { time: time, attempts: app.attempts, newTime: false, newAttempts: false }
@@ -838,7 +866,12 @@ sub App_draw(alpha as float)
         end if
     end if
     for each p in m.parts
-        m.screen.DrawRect(Int(p.x), Int(p.y), p.size, p.size, p.color)
+        if p.frames <> invalid then
+            fr = p.frames[p.f]
+            m.screen.DrawScaledObject(Int(p.x - 36 * p.k), Int(p.y - 36 * p.k), p.k, p.k, fr)
+        else
+            m.screen.DrawRect(Int(p.x), Int(p.y), p.size, p.size, p.color)
+        end if
     end for
     Draw_hud(m, r)
     if m.mode = "paused" then Draw_pause(m)
@@ -1185,7 +1218,7 @@ sub Draw_hud(app as object, r as object)
     line = "Attempt " + app.attempts.ToStr() + "   " + Fmt_time(app.ticks / 60.0)
     if app.spiral then line = "Spiral: layer " + (app.sel + 1).ToStr() + "/" + app.levels.Count().ToStr() + "   " + line
     if app.random then line = "World " + app.worldCode + "   " + line
-    if app.kids then line = line + "   (Kids mode)"
+    if app.easy then line = line + "   (Easy mode)"
     Draw_center_at(s, line, cx, cy + 64, &hFFFFFF90, app.small)
     if app.banner <> "" then
         ' a long one (a shape and its controls) in the smaller font, to stay clear of the edges
@@ -1245,8 +1278,8 @@ sub Draw_menu(app as object)
     best = app.best(app.sel)
     Menu_row(app, 0, "<   Level " + (app.sel + 1).ToStr() + ":  " + lv.name + "  (" + lv.difficulty + ")   " + best.ToStr() + "%   >", 210)
     Draw_center_at(s, Fmt_record(Record_get(app, "L" + app.sel.ToStr())), 640, 240, &hFFFFFF80, app.small)
-    speed = "Speed:   NORMAL   /   kids"
-    if app.kids then speed = "Speed:   normal   /   KIDS (slower)"
+    speed = "Speed:   NORMAL   /   easy"
+    if app.easy then speed = "Speed:   normal   /   EASY (slower)"
     Menu_row(app, 1, speed, 284)
     saved = app.spiralSaved()
     row3 = "Spiral run:   all layers in a row, from layer 1"
