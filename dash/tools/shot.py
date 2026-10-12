@@ -1,6 +1,6 @@
 """Screenshots without a Roku: run the real main.brs in the brs interpreter with the screen,
 fonts and bitmaps swapped for stand-ins that log every draw call, then paint the log with
-Pillow. Text is measured with the same font that paints it (DejaVu Sans; the Roku's own font is
+Pillow. Text is measured with the same font that paints it (DejaVu Sans, or Arial; the Roku's own font is
 similar but not the same), so centring and layout match.
 
 A scenario file defines `sub Scenario(app as object)`, sets the game up and calls
@@ -11,6 +11,7 @@ Usage: python3 dash/tools/build.py                   (once: the images come from
 """
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,13 +23,21 @@ DASH = os.path.join(HERE, '..')
 ROKU = os.path.join(DASH, 'roku')
 DIST = os.path.join(DASH, '..', 'dist')
 IMGS = os.path.join(DIST, 'spiral-shift-roku')
-BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-REGULAR = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+# DejaVu Sans where it is installed (Linux), else Arial (Windows, macOS)
+FONTS = {True: ('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 'DejaVuSans-Bold.ttf', 'arialbd.ttf',
+                '/System/Library/Fonts/Supplemental/Arial Bold.ttf'),
+         False: ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'DejaVuSans.ttf', 'arial.ttf',
+                 '/System/Library/Fonts/Supplemental/Arial.ttf')}
 SIZES = (20, 22, 24, 26, 28, 30, 32, 36, 40, 48, 64, 72, 80, 90)
 
 
 def font(size, bold):
-    return ImageFont.truetype(BOLD if bold else REGULAR, size)
+    for name in FONTS[bold]:
+        try:
+            return ImageFont.truetype(name, size)
+        except OSError:
+            pass
+    sys.exit('no DejaVu Sans or Arial font found')
 
 
 STANDINS = r'''
@@ -194,7 +203,8 @@ def main():
         open(os.path.join(tmp, 'standins.brs'), 'w').write(STANDINS + generated())
         files = [os.path.join(ROKU, 'source', f) for f in ('game.brs', 'world.brs', 'ads.brs')]
         files += [os.path.join(tmp, 'main_shot.brs'), os.path.join(tmp, 'standins.brs'), scenario]
-        out = subprocess.run(['brs', '--root', ROKU] + files, capture_output=True, text=True)
+        brs = shutil.which('brs') or sys.exit('brs not found: npm install -g brs')
+        out = subprocess.run([brs, '--root', ROKU] + files, capture_output=True, text=True)
     if 'SHOT ' not in out.stdout:
         sys.exit(out.stdout[-3000:] + out.stderr[-3000:])
     cache, name, log = {}, None, []

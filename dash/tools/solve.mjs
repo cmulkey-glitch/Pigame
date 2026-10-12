@@ -17,7 +17,10 @@ import { dirname, join } from 'node:path';
 
 const dash = join(dirname(fileURLToPath(import.meta.url)), '..');
 const root = join(dash, '..');
-const brs = process.env.BRS || spawnSync('which', ['brs'], { encoding: 'utf8' }).stdout.trim();
+// the brs interpreter's own script (brs-device.cjs loads brs's lib/ next to it): BRS=, or the global
+// npm install; `shell` so Windows finds npm.cmd
+const npmRoot = spawnSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).stdout.trim();
+const brs = process.env.BRS || join(npmRoot, 'brs', 'bin', 'cli.js');
 const pool = process.argv[2] === 'pool';
 const args = process.argv.slice(pool ? 3 : 2);
 const dir = pool ? 'pool' : 'levels';

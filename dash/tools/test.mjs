@@ -11,7 +11,10 @@ import { dirname, join } from 'node:path';
 
 const dash = join(dirname(fileURLToPath(import.meta.url)), '..');
 const root = join(dash, '..');
-const brs = process.env.BRS || spawnSync('which', ['brs'], { encoding: 'utf8' }).stdout.trim();
+// the brs interpreter's own script (brs-device.cjs loads brs's lib/ next to it): BRS=, or the global
+// npm install; `shell` so Windows finds npm.cmd
+const npmRoot = spawnSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).stdout.trim();
+const brs = process.env.BRS || join(npmRoot, 'brs', 'bin', 'cli.js');
 // brs-device.cjs wraps brs with the Roku's shared for-each iterator (see that file).
 const r = spawnSync(process.execPath, [join(root, 'tools', 'brs-device.cjs'), brs, '--root', dash,
   join(dash, 'roku', 'source', 'game.brs'), join(dash, 'roku', 'source', 'world.brs'),
@@ -19,7 +22,7 @@ const r = spawnSync(process.execPath, [join(root, 'tools', 'brs-device.cjs'), br
 process.stdout.write(r.stdout || '');
 process.stderr.write(r.stderr || '');
 const bsc = spawnSync(process.env.BSC || 'bsc', ['--root-dir', join(dash, 'roku'), '--create-package', 'false',
-  '--staging-dir', join(root, 'dist', 'bsc-staging-dash')], { encoding: 'utf8' });
+  '--staging-dir', join(root, 'dist', 'bsc-staging-dash')], { encoding: 'utf8', shell: true });
 const errors = (bsc.stdout || '') + (bsc.stderr || '');
 let compiled = bsc.status === 0 && !/ error /.test(errors);
 console.log(compiled ? 'ok   device compile check (bsc)' : 'FAIL device compile check (bsc)\n' + errors);
@@ -29,7 +32,7 @@ cpSync(join(dash, 'roku'), adsDir, { recursive: true });
 copyFileSync(join(dash, 'roku-ads', 'ads.brs'), join(adsDir, 'source', 'ads.brs'));
 appendFileSync(join(adsDir, 'manifest'), readFileSync(join(dash, 'roku-ads', 'manifest.extra')));
 const bscAds = spawnSync(process.env.BSC || 'bsc', ['--root-dir', adsDir, '--create-package', 'false',
-  '--staging-dir', join(root, 'dist', 'bsc-staging-dash-ads')], { encoding: 'utf8' });
+  '--staging-dir', join(root, 'dist', 'bsc-staging-dash-ads')], { encoding: 'utf8', shell: true });
 const adsErrors = (bscAds.stdout || '') + (bscAds.stderr || '');
 const adsOk = bscAds.status === 0 && !/ error /.test(adsErrors);
 console.log(adsOk ? 'ok   device compile check, ads build (bsc)' : 'FAIL device compile check, ads build (bsc)\n' + adsErrors);
