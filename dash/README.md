@@ -116,6 +116,15 @@ checkpoints, then for every stage of every level and every side of the pool the 
 must reach the end and never pressing must crash; world codes, seeding and cutting sides short;
 and a world must build the same from the same code. Then a BrighterScript compile check.
 
+## Screenshots
+```
+python3 dash/tools/build.py && python3 dash/tools/shot.py    # -> dist/shots/*.png
+```
+Runs the real `main.brs` in brs with the screen, fonts and bitmaps swapped for stand-ins that
+log every draw call, and paints the log with Pillow: every screen in `tests/shots.brs` (menu,
+each side in play, a crash, pause, a corner, level / spiral / world complete, the finale)
+without a Roku. The text is DejaVu Sans, close to but not the Roku's own font.
+
 ## Layout
 - `roku/source/game.brs` — level parsing and the 60 Hz physics step, one stage frame for all
   four sides (no Roku objects)

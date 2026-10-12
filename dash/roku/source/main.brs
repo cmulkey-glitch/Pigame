@@ -614,11 +614,6 @@ function Fmt_time(sec as float) as string
     return mins.ToStr() + ":" + s + "." + (tenths mod 10).ToStr()
 end function
 
-function Fmt_record(rec as object) as string
-    if rec.time < 0 then return "no record yet"
-    return "best " + Fmt_time(rec.time) + "  /  " + rec.attempts.ToStr() + " attempts"
-end function
-
 ' The triangle's and square's steer from the arrows: the arrow pointing inward on its side
 ' (away from the edge) is 1, the one pointing back at the edge -1. A tap shorter than a game
 ' step still counts for one step.
@@ -891,16 +886,81 @@ end sub
 
 sub Draw_pause(app as object)
     s = app.screen
-    s.DrawRect(0, 0, 1280, 720, &h000000A0)
-    Draw_center_at(s, "PAUSED", 640, 220, &hFFFFFFFF, app.big)
+    s.DrawRect(0, 0, 1280, 720, &h000000A8)
+    Draw_card(app, 390, 170, 500, 340, true)
+    Draw_center_at(s, "PAUSED", 640, 200, &hFFFFFFFF, app.big)
     items = ["Resume", "Quit to menu"]
-    if app.spiral then items[1] = "Quit (the spiral run is saved)"
+    if app.spiral then items[1] = "Quit  (the run is saved)"
     for i = 0 to 1
-        color = &hFFFFFF80
-        if i = app.pauseSel then color = &hFFE14DFF
-        Draw_center_at(s, items[i], 640, 340 + i * 70, color, app.mid)
+        y = 300 + i * 84
+        on = (i = app.pauseSel)
+        if on then
+            s.DrawRect(437, y - 3, 406, 70, &hFFE14DFF)
+            s.DrawRect(440, y, 400, 64, &h2A3160FF)
+            Draw_center_at(s, items[i], 640, y + 12, &hFFE14DFF, app.label)
+        else
+            s.DrawRect(440, y, 400, 64, &h0B0E1CFF)
+            Draw_center_at(s, items[i], 640, y + 12, &hFFFFFFB0, app.label)
+        end if
     end for
-    Draw_center_at(s, "Up / Down, OK.   * or Back: resume", 640, 520, &hFFFFFFB0, app.small)
+    Draw_center_at(s, "*  or  Back  resumes", 640, 470, &hFFFFFF80, app.small)
+end sub
+
+' A panel like the menu's cards: dark, with a yellow border when it has the focus.
+sub Draw_card(app as object, x as integer, y as integer, w as integer, h as integer, on as boolean)
+    if on then app.screen.DrawRect(x - 3, y - 3, w + 6, h + 6, &hFFE14DFF)
+    app.screen.DrawRect(x, y, w, h, &h141932F8)
+end sub
+
+' The end of a level, spiral run or world: the time and attempts, each against the record.
+sub Draw_complete(app as object)
+    s = app.screen
+    s.DrawRect(0, 0, 1280, 720, &h000000B0)
+    Draw_card(app, 250, 120, 780, 470, true)
+    modes = Stage_modes()
+    for i = 0 to 3
+        bob = 4 * Sin(app.frame / 12.0 + i * 1.6)
+        Draw_shape(app, modes[i], 0, 0, 535 + i * 70, 120 + bob, 0.9)
+    end for
+    title = "LEVEL COMPLETE!"
+    name = (app.sel + 1).ToStr() + ".  " + app.lv.name
+    if app.spiral then
+        title = "SPIRAL COMPLETE!"
+        name = "all 10 layers"
+    end if
+    if app.random then
+        title = "WORLD COMPLETE!"
+        name = "world " + app.worldCode
+    end if
+    if app.easy then name = name + "   (easy)"
+    Draw_center_at(s, title, 640, 168, &hFFE14DFF, app.big)
+    Draw_center_at(s, name, 640, 246, &hFFFFFFD0, app.label)
+    res = app.result
+    if res <> invalid then
+        best = "best " + Fmt_time(res.best.time)
+        if res.newTime then best = ""
+        Stat_tile(app, 330, 306, "TIME", Fmt_time(res.time), res.newTime, best)
+        best = "best " + res.best.attempts.ToStr()
+        if res.newAttempts then best = ""
+        Stat_tile(app, 650, 306, "ATTEMPTS", res.attempts.ToStr(), res.newAttempts, best)
+    end if
+    s.DrawRect(560, 522, 160, 44, &hFFE14DFF)
+    Draw_center_at(s, "OK", 640, 528, &h141932FF, app.label)
+end sub
+
+' A 300 x 180 tile: label, value, and NEW BEST or the record it did not beat.
+sub Stat_tile(app as object, x as integer, y as integer, label as string, value as string, isNew as boolean, note as string)
+    s = app.screen
+    s.DrawRect(x, y, 300, 180, &h0B0E1CFF)
+    Draw_center_at(s, label, x + 150, y + 16, &hFFFFFF90, app.small)
+    Draw_center_at(s, value, x + 150, y + 54, &hFFFFFFFF, app.big)
+    if isNew then
+        w = app.small.GetOneLineWidth("NEW BEST", 300) + 28
+        s.DrawRect(Int(x + 150 - w / 2), y + 134, w, 34, &h7CFF6BFF)
+        Draw_center_at(s, "NEW BEST", x + 150, y + 137, &h141932FF, app.small)
+    else
+        Draw_center_at(s, note, x + 150, y + 138, &hFFFFFF90, app.small)
+    end if
 end sub
 
 ' Background, edges and the stage's cells for a camera at camX.
@@ -1210,6 +1270,10 @@ end sub
 ' Progress, stage and attempts in the open middle of the screen, away from the active edge.
 sub Draw_hud(app as object, r as object)
     s = app.screen
+    if app.mode = "complete" then
+        Draw_complete(app)
+        return
+    end if
     centers = [[640, 110], [380, 300], [640, 570], [900, 300]]
     hc = centers[r.stage]
     cx = hc[0]
@@ -1239,32 +1303,6 @@ sub Draw_hud(app as object, r as object)
         Draw_center_at(s, app.banner, cx, cy - 80, info.color, font)
     end if
 
-    if app.mode = "complete" then
-        s.DrawRect(0, 0, 1280, 720, &h00000090)
-        title = "LEVEL COMPLETE!"
-        name = app.lv.name
-        if app.spiral then
-            title = "SPIRAL COMPLETE!"
-            name = "Classic spiral"
-        end if
-        if app.random then
-            title = "WORLD COMPLETE!"
-            name = "World " + app.worldCode
-        end if
-        Draw_center_at(s, title, 640, 200, &hFFE14DFF, app.big)
-        Draw_center_at(s, name, 640, 290, &hFFFFFFFF, app.mid)
-        res = app.result
-        if res <> invalid then
-            t = "Time " + Fmt_time(res.time)
-            if res.newTime then t = t + "   NEW BEST!"
-            a = "Attempts " + res.attempts.ToStr()
-            if res.newAttempts then a = a + "   NEW BEST!"
-            Draw_center_at(s, t, 640, 360, &hFFFFFFFF, app.mid)
-            Draw_center_at(s, a, 640, 420, &hFFFFFFFF, app.mid)
-            Draw_center_at(s, Fmt_record(res.best), 640, 480, &hFFFFFFB0, app.small)
-        end if
-        Draw_center_at(s, "Press OK", 640, 560, &hFFFFFFB0, app.small)
-    end if
 end sub
 
 sub Draw_center_at(s as object, text as string, cx as integer, y as integer, color as integer, font as object)
@@ -1276,7 +1314,7 @@ end sub
 ' shapes either side of it, bobbing) and four cards in Menu_order: icon, name, what OK starts
 ' (Left / Right change it on the selected card) and the record to beat.
 function Menu_order() as object
-    return [2, 3, 0, 1]     ' spiral run, random world, single level, speed (menuRow values)
+    return [2, 0, 1, 3]     ' spiral run, single level, speed, random world (menuRow values)
 end function
 
 sub Draw_menu(app as object)
