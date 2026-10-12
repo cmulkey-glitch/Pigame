@@ -35,4 +35,5 @@ you're on: the game shows you which ones at every corner.
 - Millions of random worlds, plus a world of the day
 - Best time and fewest attempts saved for every level, spiral and world
 - Original music and art
-- Plays with your Roku remote: the OK button, plus the arrows for the triangle and the square
+- Plays with your Roku remote: OK or any arrow for the ball and diamond, the arrows for the
+  triangle and the square

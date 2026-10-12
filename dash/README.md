@@ -48,7 +48,7 @@ side is solved with the real game code like the classic levels. `World_build` in
 numbers are a seeded LCG (`Rnd` cannot be seeded).
 
 ## Remote
-- OK, Play or Up is the button (ball, diamond). The triangle steers and the square switches
+- OK, Play or any arrow is the button (ball, diamond), wherever they are. The triangle steers and the square switches
   sides with the arrows toward and away from the edge being run along: Left / Right on the
   right and left sides (as in the classic levels), Up / Down on the bottom and top (where a
   random world can put them). Each corner shows the new shape and its arrows for two seconds,

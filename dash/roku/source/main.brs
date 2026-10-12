@@ -21,10 +21,10 @@
 ' side one ring in. At the centre of the spiral is the core (Draw_rings); a spiral run ends by
 ' flying into it (Finale_*).
 '
-' Remote: OK, Play or Up is the button (jump / zig-zag; see game.brs); the arrows steer the
-' triangle and switch the square's side (App_steer); * or Back
-' pauses (Resume / Quit). Menu: Up / Down pick a row (level, speed, spiral run), Left / Right
-' change it, OK starts, Back exits.
+' Remote: OK, Play or any arrow is the button (jump / zig-zag; see game.brs); the arrows steer
+' the triangle and switch the square's side (App_steer); * or Back
+' pauses (Resume / Quit). Menu: Up / Down pick a row (level, speed, spiral run, random world),
+' Left / Right change it, OK starts, Back exits.
 
 function Levels_count() as integer
     return 10
@@ -206,8 +206,8 @@ end function
 
 ' Just the keys, for the banner at a corner.
 function Shape_keys(mode as string, stage as integer) as string
-    if mode = "jump" then return "PRESS OK"
-    if mode = "wave" then return "HOLD OK"
+    if mode = "jump" then return "PRESS ANY KEY"
+    if mode = "wave" then return "HOLD ANY KEY"
     if stage mod 2 = 0 then return "UP / DOWN"
     return "LEFT / RIGHT"
 end function
@@ -250,10 +250,12 @@ end sub
 
 ' Returns false to quit the channel.
 function App_key(code as integer) as boolean
-    isJump = (code = 6 or code = 13 or code = 2)
+    ' the button: OK, Play, or any arrow (the ball and diamond take whichever is handy, wherever
+    ' they are; the triangle and square read the arrows as steering instead, App_steer)
+    isJump = (code = 6 or code = 13 or (code >= 2 and code <= 5))
     if code >= 100 then
         c = code - 100
-        if c = 6 or c = 13 or c = 2 then m.jumpDown = false
+        if c = 6 or c = 13 then m.jumpDown = false
         m.arrows.Delete(c.ToStr())
         return true
     end if
@@ -405,7 +407,7 @@ sub App_begin(i as integer, follow as boolean)
     m.deadTicks = 0
     m.tapped = false
     m.pause = 45
-    m.banner = "LEVEL " + (i + 1).ToStr()
+    m.banner = "LAYER " + (i + 1).ToStr()
     m.bannerHold = 0
     if follow then
         m.pause = 0
@@ -473,7 +475,7 @@ end sub
 sub App_step()
     r = m.run
     m.prev = { x: r.x, y: r.y, stage: r.stage }
-    held = m.jumpDown or m.tapped
+    held = m.jumpDown or m.arrows.Count() > 0 or m.tapped
     if m.tapped then r.held = false     ' a fresh press: make sure Run_step sees the edge
     m.tapped = false
     Run_step(r, held, App_steer(m, r))
@@ -612,7 +614,7 @@ sub Trans_tick(app as object)
     t.t = t.t + 1
     if t.t = ph.corner then
         app.banner = Shape_info(t.exit.mode).name + "  >>  " + Shape_info(app.run.mode).name
-        if t.sel <> app.sel then app.banner = "LEVEL " + (app.sel + 1).ToStr()
+        if t.sel <> app.sel then app.banner = "LAYER " + (app.sel + 1).ToStr()
     else if t.t = ph.build then
         ' the parts lock on
         c = Trans_corner(app)
@@ -1181,7 +1183,7 @@ sub Draw_hud(app as object, r as object)
     info = Shape_info(r.mode)
     Draw_center_at(s, "Stage " + (r.stage + 1).ToStr() + "/4  " + info.name + "  -  " + Shape_hint(r.mode, r.stage), cx, cy + 30, &hFFFFFFC0, app.small)
     line = "Attempt " + app.attempts.ToStr() + "   " + Fmt_time(app.ticks / 60.0)
-    if app.spiral then line = "Spiral: level " + (app.sel + 1).ToStr() + "/" + app.levels.Count().ToStr() + "   " + line
+    if app.spiral then line = "Spiral: layer " + (app.sel + 1).ToStr() + "/" + app.levels.Count().ToStr() + "   " + line
     if app.random then line = "World " + app.worldCode + "   " + line
     if app.kids then line = line + "   (Kids mode)"
     Draw_center_at(s, line, cx, cy + 64, &hFFFFFF90, app.small)
@@ -1247,12 +1249,12 @@ sub Draw_menu(app as object)
     if app.kids then speed = "Speed:   normal   /   KIDS (slower)"
     Menu_row(app, 1, speed, 284)
     saved = app.spiralSaved()
-    row3 = "Spiral run:   all levels in a row, from level 1"
+    row3 = "Spiral run:   all layers in a row, from layer 1"
     if saved > 0 then
         if app.spiralNew then
-            row3 = "Spiral run:   continue from level " + (saved + 1).ToStr() + "   /   NEW RUN"
+            row3 = "Spiral run:   continue from layer " + (saved + 1).ToStr() + "   /   NEW RUN"
         else
-            row3 = "Spiral run:   CONTINUE FROM LEVEL " + (saved + 1).ToStr() + "   /   new run"
+            row3 = "Spiral run:   CONTINUE FROM LAYER " + (saved + 1).ToStr() + "   /   new run"
         end if
     end if
     Menu_row(app, 2, row3, 328)
