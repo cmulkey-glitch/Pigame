@@ -48,8 +48,11 @@ side is solved with the real game code like the classic levels. `World_build` in
 numbers are a seeded LCG (`Rnd` cannot be seeded).
 
 ## Remote
-- OK, Play or Up is the button (ball, diamond). The triangle steers with Left / Right, and the
-  square switches sides with Up / Down.
+- OK, Play or Up is the button (ball, diamond). The triangle steers and the square switches
+  sides with the arrows toward and away from the edge being run along: Left / Right on the
+  right and left sides (as in the classic levels), Up / Down on the bottom and top (where a
+  random world can put them). Each corner shows the new shape and its arrows for two seconds,
+  and the HUD always does.
 - `*` or Back pauses: Resume, or Quit to the menu (a spiral run is saved).
 - Menu: Up / Down picks a row, Left / Right changes it, OK starts, Back exits. Rows: the level
   (OK plays it alone), the speed (Normal / Kids), the spiral run (continue or new), and the

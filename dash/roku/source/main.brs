@@ -128,7 +128,7 @@ function App_new(screen as object) as object
     fonts = CreateObject("roFontRegistry")
     app = {
         screen: screen, screenMain: screen, mode: "menu", sel: 0, levels: [], run: invalid, lv: invalid, kids: false
-        attempts: 0, deadTicks: 0, pause: 0, banner: "", frame: 0, parts: [], trans: invalid
+        attempts: 0, deadTicks: 0, pause: 0, banner: "", bannerHold: 0, frame: 0, parts: [], trans: invalid
         spiral: false, zoom: invalid, menuRow: 0, spiralNew: false, pauseSel: 0, resumeMode: ""
         classic: [], random: false, worldCode: "", worldChoice: 0, pool: invalid, ticks: 0
         result: invalid
@@ -188,9 +188,28 @@ end function
 
 function Shape_info(mode as string) as object
     if mode = "jump" then return { name: "BALL", sheet: "ball", color: &hFFD23FFF, hint: "press to jump" }
-    if mode = "fly" then return { name: "TRIANGLE", sheet: "triangle", color: &hFF6AD5FF, hint: "Left / Right to steer" }
-    if mode = "flip" then return { name: "SQUARE", sheet: "square", color: &h4DD6FFFF, hint: "Up / Down to switch sides" }
+    if mode = "fly" then return { name: "TRIANGLE", sheet: "triangle", color: &hFF6AD5FF, hint: "to steer" }
+    if mode = "flip" then return { name: "SQUARE", sheet: "square", color: &h4DD6FFFF, hint: "to switch sides" }
     return { name: "DIAMOND", sheet: "diamond", color: &h7CFF6BFF, hint: "hold to cut inward" }
+end function
+
+' How to play a shape on side `stage`: the triangle's and square's arrows point toward and away
+' from the edge being run along (App_steer), so they depend on the side, which in a random
+' world can be any.
+function Shape_hint(mode as string, stage as integer) as string
+    hint = Shape_info(mode).hint
+    if mode = "fly" or mode = "flip" then
+        if stage mod 2 = 0 then hint = "Up / Down " + hint else hint = "Left / Right " + hint
+    end if
+    return hint
+end function
+
+' Just the keys, for the banner at a corner.
+function Shape_keys(mode as string, stage as integer) as string
+    if mode = "jump" then return "PRESS OK"
+    if mode = "wave" then return "HOLD OK"
+    if stage mod 2 = 0 then return "UP / DOWN"
+    return "LEFT / RIGHT"
 end function
 
 ' Best % per level, kept separately for Kids mode.
@@ -365,6 +384,7 @@ sub App_start(i as integer)
     m.tapped = false
     m.pause = 45
     m.banner = "STAGE 1"
+    m.bannerHold = 0
     m.music.Stop()
     m.music.SetContentList([{ url: "pkg:/sounds/" + m.lv.music + ".mp3" }])
     m.music.Play()
@@ -386,6 +406,7 @@ sub App_begin(i as integer, follow as boolean)
     m.tapped = false
     m.pause = 45
     m.banner = "LEVEL " + (i + 1).ToStr()
+    m.bannerHold = 0
     if follow then
         m.pause = 0
         m.banner = ""
@@ -406,6 +427,7 @@ sub App_respawn()
     m.tapped = false
     m.pause = 20
     m.banner = ""
+    m.bannerHold = 0
 end sub
 
 function App_running() as boolean
@@ -421,6 +443,10 @@ sub App_tick()
         return
     end if
     if m.mode <> "play" then return
+    if m.bannerHold > 0 then
+        m.bannerHold = m.bannerHold - 1
+        if m.bannerHold = 0 and m.pause = 0 then m.banner = ""
+    end if
     alive = []
     for each p in m.parts
         p.x = p.x + p.vx
@@ -438,7 +464,7 @@ sub App_tick()
         Trans_tick(m)
     else if m.pause > 0 then
         m.pause = m.pause - 1
-        if m.pause = 0 then m.banner = ""
+        if m.pause = 0 and m.bannerHold = 0 then m.banner = ""
         m.tapped = false
     end if
 end sub
@@ -607,7 +633,9 @@ sub Trans_tick(app as object)
         end for
     else if t.t >= ph.eject then
         app.trans = invalid
-        app.banner = Shape_info(app.run.mode).name
+        ' the new shape and how to play it on this side, held for two seconds
+        app.banner = Shape_info(app.run.mode).name + ": " + Shape_keys(app.run.mode, app.run.stage)
+        app.bannerHold = 120
         app.pause = 30          ' a moment to see the new shape before it moves
         app.prev = invalid
         return
@@ -1151,13 +1179,18 @@ sub Draw_hud(app as object, r as object)
     pct = Int(p * 100).ToStr() + "%"
     s.DrawText(pct, cx + 192, cy - 8, &hFFFFFFFF, app.small)
     info = Shape_info(r.mode)
-    Draw_center_at(s, "Stage " + (r.stage + 1).ToStr() + "/4  " + info.name + "  -  " + info.hint, cx, cy + 30, &hFFFFFFC0, app.small)
+    Draw_center_at(s, "Stage " + (r.stage + 1).ToStr() + "/4  " + info.name + "  -  " + Shape_hint(r.mode, r.stage), cx, cy + 30, &hFFFFFFC0, app.small)
     line = "Attempt " + app.attempts.ToStr() + "   " + Fmt_time(app.ticks / 60.0)
     if app.spiral then line = "Spiral: level " + (app.sel + 1).ToStr() + "/" + app.levels.Count().ToStr() + "   " + line
     if app.random then line = "World " + app.worldCode + "   " + line
     if app.kids then line = line + "   (Kids mode)"
     Draw_center_at(s, line, cx, cy + 64, &hFFFFFF90, app.small)
-    if app.banner <> "" then Draw_center_at(s, app.banner, cx, cy - 80, info.color, app.big)
+    if app.banner <> "" then
+        ' a long one (a shape and its controls) in the smaller font, to stay clear of the edges
+        font = app.big
+        if font.GetOneLineWidth(app.banner, 1280) > 560 then font = app.mid
+        Draw_center_at(s, app.banner, cx, cy - 80, info.color, font)
+    end if
 
     if app.mode = "complete" then
         s.DrawRect(0, 0, 1280, 720, &h00000090)
