@@ -90,7 +90,8 @@ but was impossible in the game.
 - Roku developer dashboard, beta channel. The dashboard accepted the zip directly (no signed .pkg
   needed so far). It rejects an upload whose version is not higher: bump the manifest every time
   (the zip name carries the version so an old file is never uploaded by mistake).
-- Earlier static-analysis warnings, all fixed: RSG 1.3, version not updated, subtitle,
+- Static-analysis warnings, all fixed: RSG 1.3 (manifest `rsg_version=1.3`, and minimum firmware
+  15.1 set in the dashboard), version not updated, subtitle,
   rsg_version, memory monitor APIs (now guarded with try/catch), icon_sd must be 246x140.
 - Store text: `dash/store/listing.md`. The on-device description must stay under 200 characters.
   Store artwork: `dist/store/` (from the build); screenshots can come from `dash/tools/shot.py`.
