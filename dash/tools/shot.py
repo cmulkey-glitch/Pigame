@@ -4,7 +4,8 @@ Pillow. Text is measured with the same font that paints it (DejaVu Sans, or Aria
 similar but not the same), so centring and layout match.
 
 A scenario file defines `sub Scenario(app as object)`, sets the game up and calls
-`Shot(app, "name")` for each picture. dash/tests/shots.brs covers every screen.
+`Shot(app, "name")` for each picture. dash/tests/shots.brs covers every screen;
+dash/tests/keys.brs takes no pictures but checks the remote handling (prints ok / FAIL).
 
 Usage: python3 dash/tools/build.py                   (once: the images come from the build)
        python3 dash/tools/shot.py [scenario.brs] [out-dir]    -> dist/shots/<name>.png
@@ -205,7 +206,7 @@ def main():
         files += [os.path.join(tmp, 'main_shot.brs'), os.path.join(tmp, 'standins.brs'), scenario]
         brs = shutil.which('brs') or sys.exit('brs not found: npm install -g brs')
         out = subprocess.run([brs, '--root', ROKU] + files, capture_output=True, text=True)
-    if 'SHOT ' not in out.stdout:
+    if out.returncode != 0 or out.stderr.strip():
         sys.exit(out.stdout[-3000:] + out.stderr[-3000:])
     cache, name, log = {}, None, []
     for line in out.stdout.split('\n'):

@@ -334,8 +334,9 @@ function App_key(code as integer) as boolean
             m.music.Pause()
         else if isJump then
             ' every press counts, even if its release has not arrived yet or came in the same
-            ' frame (a quick second tap for an orb)
-            m.jumpDown = true
+            ' frame (a quick second tap for an orb). Only OK is tracked here as held: an arrow
+            ' is held while it is in m.arrows, which its own release clears.
+            if code = 6 then m.jumpDown = true
             m.tapped = true
         end if
     else if m.mode = "paused" then

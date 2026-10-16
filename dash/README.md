@@ -121,6 +121,7 @@ and a world must build the same from the same code. Then a BrighterScript compil
 ## Screenshots
 ```
 python3 dash/tools/build.py && python3 dash/tools/shot.py    # -> dist/shots/*.png
+python3 dash/tools/shot.py dash/tests/keys.brs              # remote checks: ok / FAIL
 ```
 Runs the real `main.brs` in brs with the screen, fonts and bitmaps swapped for stand-ins that
 log every draw call, and paints the log with Pillow: every screen in `tests/shots.brs` (menu,
