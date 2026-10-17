@@ -2,8 +2,9 @@ Library "Roku_Ads.brs"
 
 ' Ads for the ad-supported build (python3 dash/tools/build.py --ads), with the Roku Advertising
 ' Framework, which Roku requires for any ads. A break comes when a level, spiral run or world is
-' started from the menu (before play, never mid-run or after a crash), at most one every
-' Ads_gap() seconds, counting from launch, so a session never opens with an ad.
+' started from the menu, or between a crash and the retry once Ads_deaths() crashes have passed
+' since the last ad; never mid-run. At most one every Ads_gap() seconds, counting from launch, so
+' a session never opens with an ad.
 '
 ' The roScreen stays up while RAF plays the ads. Letting it go made the app quit when the ad
 ' ended (a Roku app quits when its last screen closes); keeping it, and a blank SceneGraph screen
@@ -12,8 +13,8 @@ Library "Roku_Ads.brs"
 ' 70% of inventory that is ours under Roku's default inventory split, SetAdUrl() takes a VAST tag
 ' from an ad network, when there is one.
 '
-' Test builds (build.py --ads-test, manifest ads_test=1): an ad before every start, from Google's
-' public sample VAST tag, and what each break did shown on the menu (app.adStatus) and printed
+' Test builds (build.py --ads-test, manifest ads_test=1): an ad before every start and every
+' second crash, from Google's public sample VAST tag, and what each break did shown on the menu (app.adStatus) and printed
 ' to the debug console (port 8085).
 
 function Ads_test() as boolean
@@ -22,7 +23,13 @@ end function
 
 function Ads_gap() as integer
     if Ads_test() then return 0
-    return 300
+    return 180
+end function
+
+' Crashes between ads: a crash ad needs this many since the last ad.
+function Ads_deaths() as integer
+    if Ads_test() then return 2
+    return 3
 end function
 
 function Ads_test_url() as string
@@ -33,6 +40,7 @@ sub Ads_init(app as object)
     app.adClock = CreateObject("roTimespan")
     app.adClock.Mark()
     app.adBreaks = 0
+    app.adDeaths = 0
     raf = Roku_Ads()
     raf.SetDebugOutput(true)
     raf.SetAdPrefs(true, 2)
@@ -42,7 +50,7 @@ sub Ads_init(app as object)
     raf.EnableAdMeasurements(true)
     if Ads_test() then
         raf.SetAdUrl(Ads_test_url())
-        Ads_status(app, "ads test build: an ad before every level, run or world")
+        Ads_status(app, "ads test build: an ad before every start and every 2nd crash")
     end if
     app.raf = raf
 end sub
@@ -58,6 +66,9 @@ sub Ads_break(app as object)
     tag = "break " + app.adBreaks.ToStr() + ": "
     ads = app.raf.GetAds()
     if ads = invalid or ads.Count() = 0 then
+        ' wait the full gap before asking again: each ask is a network call that holds the game
+        app.adClock.Mark()
+        app.adDeaths = 0
         Ads_status(app, tag + "the ad server returned no ads")
         return
     end if
@@ -74,5 +85,13 @@ sub Ads_break(app as object)
         result = "error: " + e.message
     end try
     app.adClock.Mark()
+    app.adDeaths = 0
+    if app.mode = "play" then app.music.Play()     ' a crash ad: the level goes on
     Ads_status(app, tag + "ShowAds returned " + result)
+end sub
+
+sub Ads_death(app as object)
+    if app.raf = invalid then return
+    app.adDeaths = app.adDeaths + 1
+    if app.adDeaths >= Ads_deaths() then Ads_break(app)
 end sub

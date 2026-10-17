@@ -80,8 +80,11 @@ but was impossible in the game.
   inventory split: Roku fills 30% of ad slots and keeps that money (and need not fill them); the
   app fills the other 70% from its own ad source, if it has one. Payouts are quarterly, once a
   quarter reaches $100. Expect little from ads alone until there are thousands of daily players.
-- Plan: free with ads only at natural breaks (starting a level, run or world from the menu; at
-  most one every 5 minutes, none in the first 5; never mid-run or after a crash), plus a one-time "remove ads / unlock" purchase
+- Ads at natural breaks: starting a level, run or world from the menu, and between a crash and
+  the retry after every 3rd crash; at most one every 3 minutes (shared), none in the first 3,
+  never mid-run. Death ads are the main earner in this kind of game; every-death ads would drive
+  players away. Tune `Ads_gap()` / `Ads_deaths()` in `roku-ads/ads.brs`.
+- Plan: free with those ads, plus a one-time "remove ads / unlock" purchase
   through Roku Pay (~$2.99). Roku takes a cut of purchases too (believed 20%: check).
 - The ad-supported build is a separate channel made from the same code: `build.py --ads`.
 - The Downland port elsewhere in this repository must not be sold.

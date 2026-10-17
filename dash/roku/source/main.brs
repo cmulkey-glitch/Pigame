@@ -487,7 +487,10 @@ sub App_tick()
     m.parts = alive
     if m.run.dead then
         m.deadTicks = m.deadTicks + 1
-        if m.deadTicks >= 50 then m.respawn()
+        if m.deadTicks >= 50 then
+            Ads_death(m)        ' maybe an ad between the crash and the retry (ads.brs)
+            m.respawn()
+        end if
     else if m.trans <> invalid then
         Trans_tick(m)
     else if m.pause > 0 then

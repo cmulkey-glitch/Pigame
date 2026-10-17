@@ -72,13 +72,16 @@ Enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, R
 `python3 dash/tools/build.py --ads` makes `dist/spiral-shift-ads-roku-<version>.zip`, the same
 game with video ads: `roku-ads/ads.brs` replaces the no-op `source/ads.brs`, and
 `roku-ads/manifest.extra` adds the Roku Advertising Framework library (Roku requires RAF for any
-ads). A break comes when a level, spiral run or world is started from the menu, at most once
-every 5 minutes, and never in the first 5 minutes. The game's screen stays up while the ad
+ads). A break comes when a level, spiral run or world is started from the menu, or between a
+crash and the retry once 3 crashes have passed since the last ad; at most once every 3 minutes
+(shared), and never in the first 3 minutes. If no ad comes back, it waits the full 3 minutes
+before asking again (each ask holds the game for a network call). The game's screen stays up while the ad
 plays (letting it go made the app quit when the ad ended). No ad URL is set, so RAF serves
 Roku's ads, but only to published apps approved for ads; an ad network's VAST tag would go in
 `SetAdUrl()` for the 70% of inventory Roku's default split leaves to the app.
 
-To test on a sideloaded Roku use `build.py --ads-test`: an ad before every start, from Google's
+To test on a sideloaded Roku use `build.py --ads-test`: an ad before every start and every 2nd
+crash, from Google's
 public sample ad, and what each break did shown at the bottom of the menu (and printed to the
 debug console, port 8085). Never upload the test zip.
 
