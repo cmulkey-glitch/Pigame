@@ -12,7 +12,9 @@ generated assets:
 
 With --ads: the ad-supported build instead, dist/spiral-shift-ads-roku-<version>.zip, a separate
 channel: source/ads.brs from dash/roku-ads/ (Roku Advertising Framework at natural breaks) and
-the manifest lines in dash/roku-ads/manifest.extra.
+the manifest lines in dash/roku-ads/manifest.extra. --ads-test: the same, for testing on a
+sideloaded Roku (a break every 30 s, Google's sample ads, what happened shown on the menu):
+dist/spiral-shift-ads-test-roku-<version>.zip. Never upload that one.
 
 Also writes the store listing artwork (poster 540 x 405, splash 1920 x 1080) to dist/store/.
 
@@ -357,8 +359,10 @@ SONGS = [
 
 
 def main():
-    ads = '--ads' in sys.argv[1:]
-    stage = STAGE + ('-ads' if ads else '')
+    test = '--ads-test' in sys.argv[1:]
+    ads = test or '--ads' in sys.argv[1:]
+    kind = 'ads-test-' if test else 'ads-' if ads else ''
+    stage = STAGE + ('-' + kind.rstrip('-') if kind else '')
     shutil.rmtree(stage, ignore_errors=True)
     for d in ('source', 'levels', 'pool', 'images', 'sounds'):
         os.makedirs(os.path.join(stage, d))
@@ -371,6 +375,8 @@ def main():
         shutil.copy(os.path.join(ADS, 'ads.brs'), os.path.join(stage, 'source', 'ads.brs'))
         with open(os.path.join(stage, 'manifest'), 'a') as fh:
             fh.write(open(os.path.join(ADS, 'manifest.extra')).read())
+            if test:
+                fh.write('ads_test=1\n')
 
     img = lambda name: os.path.join(stage, 'images', name)
     sheet(ball_frames(), 18).save(img('ball.png'))
@@ -410,7 +416,7 @@ def main():
     # the version in the name, so an older download is never uploaded by mistake
     man = dict(l.split('=', 1) for l in open(os.path.join(SRC, 'manifest')).read().split('\n') if '=' in l)
     version = f"{man['major_version']}.{man['minor_version']}.{man['build_version']}"
-    out = os.path.join(DIST, f"spiral-shift-{'ads-' if ads else ''}roku-{version}.zip")
+    out = os.path.join(DIST, f'spiral-shift-{kind}roku-{version}.zip')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         for base, _, files in os.walk(stage):
             for f in sorted(files):

@@ -1347,6 +1347,8 @@ sub Draw_menu(app as object)
         Menu_card(app, order[i], 160 + i * 104)
     end for
     Draw_center_at(s, "Up / Down  choose        Left / Right  change        OK  start        Back  exit", 640, 594, &hFFFFFF80, app.small)
+    ' ads test builds (roku-ads/ads.brs) report what the last ad break did
+    if app.adStatus <> invalid then Draw_center_at(s, app.adStatus, 640, 630, &hFF8A2BFF, app.small)
 end sub
 
 ' One menu card at y (88 high): icon, name, value and record.

@@ -78,6 +78,10 @@ is set, so RAF serves Roku's ads (test ads while sideloaded); an ad network's VA
 in `SetAdUrl()` for the 70% of inventory Roku's default split leaves to the app. roScreen keeps
 the display in game mode, so the screen is let go while the ads play and made again after:
 this is a prototype until it has been checked on a device.
+Roku's default ad server sends nothing to sideloaded apps, so to test on a sideloaded Roku use
+`build.py --ads-test`: a break every 30 seconds, Google's public sample ads, and what each break
+did shown at the bottom of the menu (and printed to the debug console, port 8085). Never upload
+the test zip.
 
 ## Levels
 `python3 dash/tools/levelgen.py` writes `roku/levels/1.txt` .. `10.txt`. Each stage is built
