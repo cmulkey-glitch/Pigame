@@ -97,9 +97,12 @@ but was impossible in the game.
   Store artwork: `dist/store/` (from the build); screenshots can come from `dash/tools/shot.py`.
 
 ## Known issues and risks
-- **Ads build untested on a device.** roScreen puts the display in game mode, where no other
-  screen can show, so `ads.brs` drops the screen while RAF plays and makes it again after. If RAF
-  will not play that way, the fix is a SceneGraph wrapper (a bigger job).
+- **Ads on a device: in progress.** Sideloaded apps get no ads from Roku's default server, so
+  `build.py --ads-test` uses Google's sample VAST tag. First device test (0.9.9): the ad played,
+  then the app quit, because the roScreen had been let go and a Roku app quits when its last
+  screen closes. 0.9.10's test build tries, break by break: keep the roScreen up, a blank
+  SceneGraph screen as a placeholder, a blank roImageCanvas; it saves each step so the next launch
+  shows where a quit happened. The real ads build uses "keep" until the test says otherwise.
 - **Device maths vs the tests.** The tests run in the brs interpreter, which rounds floats
   differently from a real Roku (true float32). Fairness margins should cover it, but a side with
   a very tight window could play differently on the TV. Play-test; note world code and layer.

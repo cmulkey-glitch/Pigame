@@ -32,6 +32,7 @@ end function
 sub Ads_init(app as object)
     app.adClock = CreateObject("roTimespan")
     app.adClock.Mark()
+    app.adBreaks = 0
     raf = Roku_Ads()
     raf.SetDebugOutput(true)
     raf.SetAdPrefs(true, 2)
@@ -41,7 +42,17 @@ sub Ads_init(app as object)
     raf.EnableAdMeasurements(true)
     if Ads_test() then
         raf.SetAdUrl(Ads_test_url())
-        Ads_status(app, "ads test build: a break after a finished level, every 30 s")
+        ' how far the last run got, if it ended inside an ad break
+        reg = CreateObject("roRegistrySection", "spiralshift_ads")
+        ' the break count carries over, so a method that quits the app is not simply tried again
+        if reg.Exists("breaks") then app.adBreaks = reg.Read("breaks").ToInt()
+        if reg.Exists("crumb") then
+            Ads_status(app, "last run's last ad step: " + reg.Read("crumb"))
+            reg.Delete("crumb")
+            reg.Flush()
+        else
+            Ads_status(app, "ads test build: a break after a finished level, every 30 s")
+        end if
     end if
     app.raf = raf
 end sub
@@ -51,6 +62,29 @@ sub Ads_status(app as object, text as string)
     if Ads_test() then app.adStatus = text
 end sub
 
+' A step of an ad break, saved before it is taken: if the app quits there, the next launch of a
+' test build shows it.
+sub Ads_crumb(app as object, text as string)
+    Ads_status(app, text)
+    if Ads_test() then
+        reg = CreateObject("roRegistrySection", "spiralshift_ads")
+        reg.Write("crumb", text)
+        reg.Flush()
+    end if
+end sub
+
+' How an ad is shown over the game. A Roku app quits when its last screen closes, so the game's
+' screen cannot simply be let go while RAF shows its own (the first device test did that, and
+' the app quit when the ad ended). Under test, break by break in turn:
+'   keep    the roScreen stays up while RAF plays
+'   scene   a blank SceneGraph screen holds the app open (and is RAF's view); the roScreen is
+'           let go and made again after
+'   canvas  the same with a blank roImageCanvas (an old component; may be gone from the Roku)
+function Ads_strategy(app as object) as string
+    if not Ads_test() then return "keep"
+    return ["canvas", "keep", "scene"][app.adBreaks mod 3]
+end function
+
 sub Ads_break(app as object)
     if app.raf = invalid then return
     wait = Ads_gap() - app.adClock.TotalSeconds()
@@ -58,20 +92,60 @@ sub Ads_break(app as object)
         Ads_status(app, "no break yet: " + wait.ToStr() + " s to go")
         return
     end if
+    app.adBreaks = app.adBreaks + 1
+    if Ads_test() then
+        reg = CreateObject("roRegistrySection", "spiralshift_ads")
+        reg.Write("breaks", app.adBreaks.ToStr())
+        reg.Flush()
+    end if
+    how = Ads_strategy(app)
+    tag = "break " + app.adBreaks.ToStr() + " (" + how + "): "
+    Ads_crumb(app, tag + "asking for ads")
     ads = app.raf.GetAds()
     if ads = invalid or ads.Count() = 0 then
-        Ads_status(app, "break: the ad server returned no ads")
+        Ads_crumb(app, tag + "the ad server returned no ads")
         return
     end if
     app.music.Stop()
-    App_screen_release(app)
-    shown = app.raf.ShowAds(ads, invalid, invalid)
-    App_screen_new(app)
-    app.adClock.Mark()
-    result = type(shown)
-    if result = "Boolean" or result = "roBoolean" then
-        result = "false"
-        if shown then result = "true"
+    facade = invalid
+    view = invalid
+    if how = "scene" then
+        facade = CreateObject("roSGScreen")
+        facade.SetMessagePort(CreateObject("roMessagePort"))
+        view = facade.CreateScene("Scene")
+        facade.Show()
+        App_screen_release(app)
+    else if how = "canvas" then
+        facade = CreateObject("ro" + "ImageCanvas")     ' split: the compile check no longer knows it
+        if facade = invalid then
+            Ads_crumb(app, tag + "roImageCanvas not available on this Roku")
+            return
+        end if
+        facade.Show()
+        App_screen_release(app)
     end if
-    Ads_status(app, "break: " + ads.Count().ToStr() + " ad pod(s); ShowAds returned " + result)
+    Ads_crumb(app, tag + "showing " + ads.Count().ToStr() + " ad pod(s)")
+    result = "error"
+    try
+        shown = app.raf.ShowAds(ads, invalid, view)
+        result = type(shown)
+        if result = "Boolean" or result = "roBoolean" then
+            result = "false"
+            if shown then result = "true"
+        end if
+    catch e
+        result = "error: " + e.message
+    end try
+    Ads_crumb(app, tag + "ShowAds returned " + result + "; making the game screen")
+    if facade <> invalid then
+        App_screen_new(app)
+        facade.Close()
+    end if
+    app.adClock.Mark()
+    Ads_crumb(app, tag + "ShowAds returned " + result + "; back in the game")
+    if Ads_test() then
+        reg = CreateObject("roRegistrySection", "spiralshift_ads")
+        reg.Delete("crumb")
+        reg.Flush()
+    end if
 end sub
