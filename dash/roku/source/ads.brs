@@ -11,3 +11,7 @@ end sub
 ' A crash, after its animation and before the retry: where an ad may play.
 sub Ads_death(app as object)
 end sub
+
+' The test build's "play an ad now" button (Fast Forward on the menu).
+sub Ads_now(app as object)
+end sub

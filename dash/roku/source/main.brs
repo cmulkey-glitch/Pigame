@@ -275,6 +275,7 @@ function App_key(code as integer) as boolean
     end if
     if m.mode = "menu" then
         if code = 0 then return false
+        if code = 9 then Ads_now(m)        ' Fast Forward: an ad now, in ads test builds only
         n = m.levels.Count()
         if code = 2 or code = 3 then
             ' up and down the cards as shown (Menu_order)

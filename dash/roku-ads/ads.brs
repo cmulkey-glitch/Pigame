@@ -14,7 +14,8 @@ Library "Roku_Ads.brs"
 ' from an ad network, when there is one.
 '
 ' Test builds (build.py --ads-test, manifest ads_test=1): an ad before every start and every
-' second crash, from Google's public sample VAST tag, and what each break did shown on the menu (app.adStatus) and printed
+' second crash, and whenever Fast Forward is pressed on the menu, from Google's public sample
+' VAST tag, and what each break did shown on the menu (app.adStatus) and printed
 ' to the debug console (port 8085).
 
 function Ads_test() as boolean
@@ -50,7 +51,7 @@ sub Ads_init(app as object)
     raf.EnableAdMeasurements(true)
     if Ads_test() then
         raf.SetAdUrl(Ads_test_url())
-        Ads_status(app, "ads test build: an ad before every start and every 2nd crash")
+        Ads_status(app, "ads test build: Fast Forward plays an ad; also every start and 2nd crash")
     end if
     app.raf = raf
 end sub
@@ -62,6 +63,15 @@ end sub
 
 sub Ads_break(app as object)
     if app.raf = invalid or app.adClock.TotalSeconds() < Ads_gap() then return
+    Ads_play(app)
+end sub
+
+' Test builds: Fast Forward on the menu plays an ad there and then.
+sub Ads_now(app as object)
+    if app.raf <> invalid and Ads_test() then Ads_play(app)
+end sub
+
+sub Ads_play(app as object)
     app.adBreaks = app.adBreaks + 1
     tag = "break " + app.adBreaks.ToStr() + ": "
     ads = app.raf.GetAds()

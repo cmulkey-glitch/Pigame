@@ -80,8 +80,8 @@ plays (letting it go made the app quit when the ad ended). No ad URL is set, so 
 Roku's ads, but only to published apps approved for ads; an ad network's VAST tag would go in
 `SetAdUrl()` for the 70% of inventory Roku's default split leaves to the app.
 
-To test on a sideloaded Roku use `build.py --ads-test`: an ad before every start and every 2nd
-crash, from Google's
+To test on a sideloaded Roku use `build.py --ads-test`: Fast Forward on the menu plays an ad
+there and then, and there is an ad before every start and every 2nd crash, from Google's
 public sample ad, and what each break did shown at the bottom of the menu (and printed to the
 debug console, port 8085). Never upload the test zip.
 
