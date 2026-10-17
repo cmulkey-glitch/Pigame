@@ -80,8 +80,8 @@ but was impossible in the game.
   inventory split: Roku fills 30% of ad slots and keeps that money (and need not fill them); the
   app fills the other 70% from its own ad source, if it has one. Payouts are quarterly, once a
   quarter reaches $100. Expect little from ads alone until there are thousands of daily players.
-- Plan: free with ads only at natural breaks (leaving a finished level, run or world; at most one
-  every 5 minutes; never mid-run or after a crash), plus a one-time "remove ads / unlock" purchase
+- Plan: free with ads only at natural breaks (starting a level, run or world from the menu; at
+  most one every 5 minutes, none in the first 5; never mid-run or after a crash), plus a one-time "remove ads / unlock" purchase
   through Roku Pay (~$2.99). Roku takes a cut of purchases too (believed 20%: check).
 - The ad-supported build is a separate channel made from the same code: `build.py --ads`.
 - The Downland port elsewhere in this repository must not be sold.
@@ -97,12 +97,12 @@ but was impossible in the game.
   Store artwork: `dist/store/` (from the build); screenshots can come from `dash/tools/shot.py`.
 
 ## Known issues and risks
-- **Ads on a device: in progress.** Sideloaded apps get no ads from Roku's default server, so
-  `build.py --ads-test` uses Google's sample VAST tag. First device test (0.9.9): the ad played,
-  then the app quit, because the roScreen had been let go and a Roku app quits when its last
-  screen closes. 0.9.10's test build tries, break by break: keep the roScreen up, a blank
-  SceneGraph screen as a placeholder, a blank roImageCanvas; it saves each step so the next launch
-  shows where a quit happened. The real ads build uses "keep" until the test says otherwise.
+- **Ads on a device: working with Google's sample ad.** Sideloaded apps get no ads from Roku's
+  default server, so `build.py --ads-test` uses Google's sample VAST tag. 0.9.9: the ad played,
+  then the app quit, because the roScreen had been let go (a Roku app quits when its last screen
+  closes). 0.9.10: keeping the roScreen up, and a blank SceneGraph placeholder, both worked; the
+  game now keeps the roScreen up. Real Roku ads will only arrive once the app is published and
+  approved for ads: check the first published build.
 - **Device maths vs the tests.** The tests run in the brs interpreter, which rounds floats
   differently from a real Roku (true float32). Fairness margins should cover it, but a side with
   a very tight window could play differently on the TV. Play-test; note world code and layer.

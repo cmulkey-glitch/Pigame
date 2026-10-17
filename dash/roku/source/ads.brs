@@ -4,6 +4,6 @@
 sub Ads_init(app as object)
 end sub
 
-' A natural break (a level, spiral run or world just finished): where an ad may play.
+' A natural break (a level, spiral run or world about to start from the menu): where an ad may play.
 sub Ads_break(app as object)
 end sub

@@ -124,16 +124,12 @@ sub App_low_memory(app as object)
     app.parts = []
 end sub
 
-' The display: a double-buffered roScreen on the app's port. Let go (every reference dropped)
-' while something else must show, such as an ad (ads.brs), and made again after.
+' The display: a double-buffered roScreen on the app's port. It stays up for the whole run, ads
+' included: a Roku app quits when its last screen closes.
 sub App_screen_new(app as object)
     app.screen = CreateObject("roScreen", true, 1280, 720)
     app.screen.SetMessagePort(app.port)
     app.screen.SetAlphaEnable(true)
-end sub
-
-sub App_screen_release(app as object)
-    app.screen = invalid
 end sub
 
 function App_new(port as object) as object
@@ -306,6 +302,7 @@ function App_key(code as integer) as boolean
             if code = 4 then m.worldChoice = (m.worldChoice + choices.Count() - 1) mod choices.Count()
             if code = 5 then m.worldChoice = (m.worldChoice + 1) mod choices.Count()
         end if
+        if (code = 6 or code = 13) and m.menuRow <> 1 then Ads_break(m)    ' before play (ads.brs)
         if code = 6 or code = 13 then
             m.ticks = 0
             m.result = invalid
@@ -350,10 +347,7 @@ function App_key(code as integer) as boolean
             m.quit()
         end if
     else if m.mode = "complete" then
-        if code = 0 or code = 6 or code = 13 then
-            App_menu(m)
-            Ads_break(m)
-        end if
+        if code = 0 or code = 6 or code = 13 then App_menu(m)
     end if
     return true
 end function

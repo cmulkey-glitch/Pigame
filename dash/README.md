@@ -70,18 +70,17 @@ Enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Right, Left, R
 
 ## Ad-supported build
 `python3 dash/tools/build.py --ads` makes `dist/spiral-shift-ads-roku-<version>.zip`, the same
-game as a separate channel with video ads: `roku-ads/ads.brs` replaces the no-op
-`source/ads.brs`, and `roku-ads/manifest.extra` adds the Roku Advertising Framework library
-(Roku requires RAF for any ads). A break comes only when you leave a finished level, spiral run
-or world for the menu, at most once every 5 minutes, and never in the first 5 minutes. No ad URL
-is set, so RAF serves Roku's ads (test ads while sideloaded); an ad network's VAST tag would go
-in `SetAdUrl()` for the 70% of inventory Roku's default split leaves to the app. roScreen keeps
-the display in game mode, so the screen is let go while the ads play and made again after:
-this is a prototype until it has been checked on a device.
-Roku's default ad server sends nothing to sideloaded apps, so to test on a sideloaded Roku use
-`build.py --ads-test`: a break every 30 seconds, Google's public sample ads, and what each break
-did shown at the bottom of the menu (and printed to the debug console, port 8085). Never upload
-the test zip.
+game with video ads: `roku-ads/ads.brs` replaces the no-op `source/ads.brs`, and
+`roku-ads/manifest.extra` adds the Roku Advertising Framework library (Roku requires RAF for any
+ads). A break comes when a level, spiral run or world is started from the menu, at most once
+every 5 minutes, and never in the first 5 minutes. The game's screen stays up while the ad
+plays (letting it go made the app quit when the ad ended). No ad URL is set, so RAF serves
+Roku's ads, but only to published apps approved for ads; an ad network's VAST tag would go in
+`SetAdUrl()` for the 70% of inventory Roku's default split leaves to the app.
+
+To test on a sideloaded Roku use `build.py --ads-test`: an ad before every start, from Google's
+public sample ad, and what each break did shown at the bottom of the menu (and printed to the
+debug console, port 8085). Never upload the test zip.
 
 ## Levels
 `python3 dash/tools/levelgen.py` writes `roku/levels/1.txt` .. `10.txt`. Each stage is built
