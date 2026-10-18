@@ -62,6 +62,7 @@ sub Ads_status(app as object, text as string)
 end sub
 
 sub Ads_break(app as object)
+    if app.full = true then return      ' the full version (store.brs) has no ads
     if app.raf = invalid or app.adClock.TotalSeconds() < Ads_gap() then return
     Ads_play(app)
 end sub
@@ -101,7 +102,7 @@ sub Ads_play(app as object)
 end sub
 
 sub Ads_death(app as object)
-    if app.raf = invalid then return
+    if app.raf = invalid or app.full = true then return
     app.adDeaths = app.adDeaths + 1
     if app.adDeaths >= Ads_deaths() then Ads_break(app)
 end sub

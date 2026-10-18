@@ -85,6 +85,20 @@ there and then, and there is an ad before every start and every 2nd crash, from 
 public sample ad, and what each break did shown at the bottom of the menu (and printed to the
 debug console, port 8085). Never upload the test zip.
 
+## Full version (Roku Pay)
+The free build also sells a one-time "full version" (`roku-ads/store.brs`, product code in
+`Store_product()`, currently `spiralshift_full`: it must match the product in the Developer
+Dashboard). Today's world is free; a new world and the last world played show a padlock and
+"OK to unlock <price>", and OK there opens Roku's purchase screen. Owning it opens every world and
+turns the ads off. On launch the game reads the catalog (price) and the account's purchases;
+ownership is also kept in the registry, so it works offline, and a purchases list without the
+product (a refund) locks it again. The regular build has no ads and everything open
+(`source/store.brs` is a stub).
+
+To test purchases: in the Developer Dashboard set the channel for "billing testing" and add your
+Roku account as a test user, then sideload the free build on a Roku linked to that account.
+Purchases are real calls to Roku but are not charged.
+
 ## Levels
 `python3 dash/tools/levelgen.py` writes `roku/levels/1.txt` .. `10.txt`. Each stage is built
 from obstacle patterns, and a pattern is only kept if it is fair from where the previous one

@@ -127,8 +127,8 @@ but was impossible in the game.
 ## To do / next
 1. Test the ads build on the TV: finish a level after 5 minutes, press OK, check that an ad plays
    and the game comes back. Fall back to SceneGraph if not.
-2. Lock random worlds behind the purchase (decide what stays free: maybe the world of the day),
-   with a padlock and an "unlock" line on the card; Roku Pay one-time product; restore purchases.
+2. Roku Pay unlock: built (0.9.14, `roku-ads/store.brs`); today's world free, the rest and
+   no ads with the purchase. Needs the real product code from the dashboard and a billing test.
 3. Refresh store screenshots and artwork from `shot.py` for the new menu and screens.
 4. Make the GitHub repository private or delete it (it was public), keep the local copy backed up.
 5. Prepare for public release: certification checklist (deep linking is accepted; memory monitor

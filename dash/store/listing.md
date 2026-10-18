@@ -25,14 +25,15 @@ ten in one run. You can pause at any time, and a spiral run is saved when
 you quit, so you can pick it up later.
 
 Want something new? Random worlds build a fresh ten-level spiral from a five-letter code. Play
-today's world (the same for everyone, so you can compare times with friends), roll a new one,
-or replay the last. In random worlds the shapes trade sides too, so the arrows follow the edge
+today's world free (the same for everyone, so you can compare times with friends), or get the
+full version to roll a new world any time, replay the last one, and play with no ads. In random worlds the shapes trade sides too, so the arrows follow the edge
 you're on: the game shows you which ones at every corner.
 
 - 10 levels, from Easy to Insane
 - 4 shapes, each with its own control
 - Easy mode slows the whole game down without changing the levels
-- Millions of random worlds, plus a world of the day
+- A free world of the day; millions more random worlds in the full version
+- Free with ads; one purchase unlocks everything and removes them
 - Best time and fewest attempts saved for every level, spiral and world
 - Original music and art
 - Plays with your Roku remote: OK or any arrow for the ball and diamond, the arrows for the

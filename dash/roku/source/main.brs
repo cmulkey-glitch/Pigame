@@ -39,6 +39,7 @@ sub Main(args as dynamic)
     port = CreateObject("roMessagePort")
     app = App_new(port)
     Ads_init(app)
+    Store_init(app)
     Deep_link(app, args)
     Memory_watch(port)
     ' deep links while running (supports_input_launch in the manifest): accepted, nothing to open
@@ -61,6 +62,8 @@ sub Main(args as dynamic)
                 App_low_memory(app)
             else if type(msg) = "roInputEvent" then
                 if msg.IsInput() then Deep_link(app, msg.GetInfo())
+            else if type(msg) = "roChannelStoreEvent" then
+                Store_event(app, msg)
             end if
             msg = port.GetMessage()
         end while
@@ -303,7 +306,8 @@ function App_key(code as integer) as boolean
             if code = 4 then m.worldChoice = (m.worldChoice + choices.Count() - 1) mod choices.Count()
             if code = 5 then m.worldChoice = (m.worldChoice + 1) mod choices.Count()
         end if
-        if (code = 6 or code = 13) and m.menuRow <> 1 then Ads_break(m)    ' before play (ads.brs)
+        locked = m.menuRow = 3 and World_choices(m)[m.worldChoice].locked
+        if (code = 6 or code = 13) and m.menuRow <> 1 and not locked then Ads_break(m)    ' before play (ads.brs)
         if code = 6 or code = 13 then
             m.ticks = 0
             m.result = invalid
@@ -316,6 +320,8 @@ function App_key(code as integer) as boolean
                 if m.spiralNew then from = 0
                 m.attempts = 1
                 m.begin(from, false)
+            else if m.menuRow = 3 and locked then
+                Store_buy(m)
             else if m.menuRow = 3 then
                 choice = World_choices(m)[m.worldChoice]
                 seed = choice.seed
@@ -372,10 +378,12 @@ end sub
 ' (seed -1: a new seed when chosen)
 function World_choices(app as object) as object
     daily = World_daily_seed()
-    choices = [{ label: "today's world  " + World_code(daily), seed: daily }, { label: "a new world, every time", seed: -1 }]
+    ' today's world is free; the others need the full version (store.brs) in the free build
+    locked = not app.full
+    choices = [{ label: "today's world  " + World_code(daily), seed: daily, locked: false }, { label: "a new world, every time", seed: -1, locked: locked }]
     if app.reg.Exists("lastworld") then
         last = app.reg.Read("lastworld")
-        if last <> World_code(daily) then choices.Push({ label: "the last world played  " + last, seed: World_seed(last) })
+        if last <> World_code(daily) then choices.Push({ label: "the last world played  " + last, seed: World_seed(last), locked: locked })
     end if
     return choices
 end function
@@ -1345,14 +1353,24 @@ sub Draw_menu(app as object)
         Menu_card(app, order[i], 160 + i * 104)
     end for
     Draw_center_at(s, "Up / Down  choose        Left / Right  change        OK  start        Back  exit", 640, 594, &hFFFFFF80, app.small)
-    ' ads test builds (roku-ads/ads.brs) report what the last ad break did
-    if app.adStatus <> invalid then Draw_center_at(s, app.adStatus, 640, 630, &hFF8A2BFF, app.small)
+    ' the purchase's progress (store.brs); ads test builds' last ad break (roku-ads/ads.brs)
+    if app.storeNote <> invalid then Draw_center_at(s, app.storeNote, 640, 630, &h7CFF6BFF, app.small)
+    if app.adStatus <> invalid then Draw_center_at(s, app.adStatus, 640, 650, &hFF8A2BFF, app.small)
+end sub
+
+' A small padlock, 20 x 24, top left at (x, y).
+sub Draw_lock(s as object, x as integer, y as integer, color as integer)
+    s.DrawRect(x + 4, y, 12, 3, color)
+    s.DrawRect(x + 4, y, 3, 11, color)
+    s.DrawRect(x + 13, y, 3, 11, color)
+    s.DrawRect(x, y + 10, 20, 14, color)
 end sub
 
 ' One menu card at y (88 high): icon, name, value and record.
 sub Menu_card(app as object, row as integer, y as integer)
     s = app.screen
     on = (row = app.menuRow)
+    lock = false
     x = 200
     w = 880
     accent = &hFFE14DFF
@@ -1383,6 +1401,7 @@ sub Menu_card(app as object, row as integer, y as integer)
         value = choice.label
         if choice.seed >= 0 then rec = Record_get(app, "W" + World_code(choice.seed))
         sw = true
+        lock = choice.locked
     else if row = 0 then
         lv = app.levels[app.sel]
         name = "SINGLE LEVEL"
@@ -1418,8 +1437,21 @@ sub Menu_card(app as object, row as integer, y as integer)
         s.DrawText("<", vx, y + 50, accent, app.small)
         vx = vx + 26
     end if
+    if lock then
+        Draw_lock(s, vx + 2, y + 52, valueColor)
+        vx = vx + 30
+    end if
     s.DrawText(value, vx, y + 50, valueColor, app.small)
     if on and sw then s.DrawText(">", vx + app.small.GetOneLineWidth(value, 800) + 12, y + 50, accent, app.small)
+
+    ' a locked world: what unlocks it, where the record would be
+    if lock then
+        t = "full version"
+        if on then t = "OK to unlock"
+        if app.price <> invalid and app.price <> "" then t = t + "  " + app.price
+        s.DrawText(t, x + w - 20 - app.small.GetOneLineWidth(t, 600), y + 50, accent, app.small)
+        rec = invalid
+    end if
 
     ' the record to beat, right-aligned on the name row
     if rec <> invalid then

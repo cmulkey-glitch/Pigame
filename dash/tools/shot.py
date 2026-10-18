@@ -122,6 +122,8 @@ sub Main()
     m.shotReg = {}
     _brs_.mockComponent("roRegistrySection", { Exists: function(k) : return GetGlobalAA().shotReg.DoesExist(k) : end function, Read: function(k) : return GetGlobalAA().shotReg[k] : end function, Write: sub(k, v) : GetGlobalAA().shotReg[k] = v : end sub, Flush: sub() : end sub, Delete: sub(k) : GetGlobalAA().shotReg.Delete(k) : end sub })
     app = App_new(CreateObject("roMessagePort"))
+    Ads_init(app)
+    Store_init(app)
     Scenario(app)
 end sub
 '''
@@ -202,7 +204,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'main_shot.brs'), 'w').write(src)
         open(os.path.join(tmp, 'standins.brs'), 'w').write(STANDINS + generated())
-        files = [os.path.join(ROKU, 'source', f) for f in ('game.brs', 'world.brs', 'ads.brs')]
+        files = [os.path.join(ROKU, 'source', f) for f in ('game.brs', 'world.brs', 'ads.brs', 'store.brs')]
         files += [os.path.join(tmp, 'main_shot.brs'), os.path.join(tmp, 'standins.brs'), scenario]
         brs = shutil.which('brs') or sys.exit('brs not found: npm install -g brs')
         out = subprocess.run([brs, '--root', ROKU] + files, capture_output=True, text=True)

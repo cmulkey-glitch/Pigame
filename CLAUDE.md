@@ -36,6 +36,7 @@ Downland port (`roku/`, `src/`, `tools/` except `tools/brs-device.cjs`) that mus
 - The ads build (`dash/roku-ads/ads.brs`, Roku Advertising Framework) is an untested prototype:
   it releases the roScreen while RAF plays ads and recreates it. Needs a device test; if RAF will
   not show over a roScreen app, the fallback is a SceneGraph wrapper.
-- Random world is the bottom menu card because it is meant to be locked (paid unlock, e.g. a
-  "Remove ads / unlock" Roku Pay purchase). Not built yet.
+- The free build (`--ads`) has the ads and a Roku Pay "full version" (`roku-ads/store.brs`):
+  today's world free, other random worlds and no ads with the purchase. The product code in
+  `Store_product()` must match the dashboard product; not yet tested with real billing.
 - The GitHub repository was public; the owner is moving to local-only.

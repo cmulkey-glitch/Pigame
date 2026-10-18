@@ -11,7 +11,8 @@ generated assets:
                                                checkpoint.wav
 
 With --ads: the ad-supported build instead, dist/spiral-shift-ads-roku-<version>.zip, a separate
-channel: source/ads.brs from dash/roku-ads/ (Roku Advertising Framework at natural breaks) and
+channel: source/ads.brs and store.brs from dash/roku-ads/ (Roku Advertising Framework ads at
+natural breaks, and the Roku Pay unlock that turns them off) and
 the manifest lines in dash/roku-ads/manifest.extra. --ads-test: the same, for testing on a
 sideloaded Roku (a break every 30 s, Google's sample ads, what happened shown on the menu):
 dist/spiral-shift-ads-test-roku-<version>.zip. Never upload that one.
@@ -372,7 +373,9 @@ def main():
             if f.endswith(ext):
                 shutil.copy(os.path.join(SRC, sub, f), os.path.join(stage, sub))
     if ads:
-        shutil.copy(os.path.join(ADS, 'ads.brs'), os.path.join(stage, 'source', 'ads.brs'))
+        for f in sorted(os.listdir(ADS)):          # ads.brs, store.brs: replace the stubs
+            if f.endswith('.brs'):
+                shutil.copy(os.path.join(ADS, f), os.path.join(stage, 'source', f))
         with open(os.path.join(stage, 'manifest'), 'a') as fh:
             fh.write(open(os.path.join(ADS, 'manifest.extra')).read())
             if test:

@@ -26,10 +26,10 @@ const bsc = spawnSync(process.env.BSC || 'bsc', ['--root-dir', join(dash, 'roku'
 const errors = (bsc.stdout || '') + (bsc.stderr || '');
 let compiled = bsc.status === 0 && !/ error /.test(errors);
 console.log(compiled ? 'ok   device compile check (bsc)' : 'FAIL device compile check (bsc)\n' + errors);
-// the ad-supported build (build.py --ads): dash/roku with dash/roku-ads/ads.brs swapped in
+// the free build (build.py --ads): dash/roku with dash/roku-ads/ads.brs and store.brs swapped in
 const adsDir = mkdtempSync(join(tmpdir(), 'ads-'));
 cpSync(join(dash, 'roku'), adsDir, { recursive: true });
-copyFileSync(join(dash, 'roku-ads', 'ads.brs'), join(adsDir, 'source', 'ads.brs'));
+for (const f of ['ads.brs', 'store.brs']) copyFileSync(join(dash, 'roku-ads', f), join(adsDir, 'source', f));
 appendFileSync(join(adsDir, 'manifest'), readFileSync(join(dash, 'roku-ads', 'manifest.extra')));
 const bscAds = spawnSync(process.env.BSC || 'bsc', ['--root-dir', adsDir, '--create-package', 'false',
   '--staging-dir', join(root, 'dist', 'bsc-staging-dash-ads')], { encoding: 'utf8', shell: true });
