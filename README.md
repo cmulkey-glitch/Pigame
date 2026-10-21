@@ -83,10 +83,10 @@ Sideload: enable developer mode on the Roku (Home ×3, Up ×2, Right, Left, Righ
 open `http://<roku-ip>` in a browser, log in as `rokudev`, upload the zip, press Install.
 
 Remote, held sideways (top to the left): Up moves left, Down moves right, Right climbs up,
-Left climbs down. Play or OK jumps, in the direction held or released in the last ~12 frames,
-since a Roku remote can't send two buttons together. A jump keeps its direction until you land,
-then you stop unless an arrow is held; Play within ~12 frames of landing chains another jump
-the same way. Back returns to the title (exits from the title), Rew / Fwd step through
+Left climbs down. Play or OK jumps. A Roku remote can't send two buttons together, so the jump's
+direction is the arrow you're holding; on a rope, the left/right arrow tapped in the last half
+second (tap, then Play); on the ground, the arrow you were walking with. Standing still, jumps
+go straight up. Back returns to the title (exits from the title), Rew / Fwd step through
 chambers (playtest).
 
 ## Spiral Shift (Roku)
