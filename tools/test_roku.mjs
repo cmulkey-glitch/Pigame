@@ -4,7 +4,8 @@
 // Needs `npm install -g brs brighterscript`, or BRS= / BSC= paths to the binaries.
 // Usage: node tools/test_roku.mjs
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, mkdtempSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -13,7 +14,11 @@ const game = readdirSync(join(root, 'roku', 'source')).filter((f) => f.endsWith(
   .map((f) => join(root, 'roku', 'source', f));
 // brs-device.cjs wraps brs with the Roku's shared for-each iterator (see that file).
 const brs = process.env.BRS || spawnSync('which', ['brs'], { encoding: 'utf8' }).stdout.trim();
-const r = spawnSync(process.execPath, [join(root, 'tools', 'brs-device.cjs'), brs, '--root', root, ...game,
+// brs reads every SceneGraph component under its root, so give it a root holding only what
+// these tests read (pkg:/data, pkg:/tests); the repo's other Roku apps would get in the way.
+const pkg = mkdtempSync(join(tmpdir(), 'downland-brs-'));
+for (const d of ['data', 'tests', 'roku']) symlinkSync(join(root, d), join(pkg, d));
+const r = spawnSync(process.execPath, [join(root, 'tools', 'brs-device.cjs'), brs, '--root', pkg, ...game,
   join(root, 'tests', 'roku', 'tests.brs')], { encoding: 'utf8' });
 process.stdout.write(r.stdout || '');
 process.stderr.write(r.stderr || '');

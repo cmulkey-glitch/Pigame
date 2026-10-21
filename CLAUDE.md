@@ -1,10 +1,19 @@
 # Project notes for Claude
 
-The active project is **Spiral Shift**, a Roku game in `dash/`. Read `dash/README.md` (how it
-works, every tool, the file layout) and `dash/NOTES.md` (why it is this way, known issues, to-do). The rest of the repository is older work: a
-Downland port (`roku/`, `src/`, `tools/` except `tools/brs-device.cjs`) that must not be sold.
+This repository holds three active projects, all on the branch
+`claude/downland-html5-recreation-95z0uv` (the only branch; develop there):
 
-## The game in brief
+- **Downland port** (`src/`, `roku/`, `editor.html`, `levels/`, `tools/`, `tests/`): the Atari
+  7800 Downland recreation ported to HTML5 and Roku, plus a chamber editor with physics sliders
+  and original starter levels. See `README.md`. The ROM-derived chambers, art, sounds and name
+  must not be sold; the plan is an original game on this engine (new levels, art, sound, name,
+  physics rewritten from `docs/PHYSICS.md`).
+- **Spiral Shift** (`dash/`): an original Roku game. Read `dash/README.md` (how it works, every
+  tool, the file layout) and `dash/NOTES.md` (why it is this way, known issues, to-do). The
+  notes below are about it.
+- **Living Room Dashboard** (`roku-dashboard/`): a Roku screensaver. See `roku-dashboard/README.md`.
+
+## Spiral Shift in brief
 - Each level is the four edges of the screen: ball (bottom, jump), triangle (right, steer with the
   arrows, no gravity), square (top, Up / Down switches gravity side), diamond (left, hold to cut
   inward). Corners are checkpoints with a rocket animation that turns one shape into the next.
